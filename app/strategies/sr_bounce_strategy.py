@@ -1,5 +1,4 @@
 import sys, os
-from numba import njit
 parent_folder = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_folder)
 

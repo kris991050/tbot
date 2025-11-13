@@ -1,4 +1,4 @@
-import os, platform, pytz, time, pandas as pd, tzlocal
+import os, platform, pytz, pandas as pd, tzlocal
 
 def get_sys(display=False):
 

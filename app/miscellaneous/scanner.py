@@ -1,7 +1,7 @@
-import os, sys, requests, requests_html, pandas as pd, csv, datetime#,  asyncio
+import sys, requests, pandas as pd
 from bs4 import BeautifulSoup
 from tradingview_screener import Query, Column
-from playwright.sync_api import sync_playwright, Playwright
+from playwright.sync_api import sync_playwright
 from utils import helpers, constants
 # from selenium import webdriver
 # from selenium.webdriver.chrome.service import Service as ChromeService

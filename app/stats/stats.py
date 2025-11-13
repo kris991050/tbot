@@ -1,4 +1,4 @@
-import sys, os, datetime, pandas as pd
+import sys, os, pandas as pd
 from ib_insync import *
 parent_folder = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_folder)

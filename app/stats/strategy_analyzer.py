@@ -1,4 +1,4 @@
-import sys, os, datetime, pandas as pd, numpy as np, bisect, traceback
+import sys, os, datetime, pandas as pd, numpy as np, traceback
 from tqdm import tqdm
 from ib_insync import *
 parent_folder = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
