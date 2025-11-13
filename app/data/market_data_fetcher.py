@@ -93,6 +93,8 @@ class MarketDataFetcher:
         # full_range = pd.date_range(start=df.index.min(), end=df.index.max(), freq=self.timeframe_unit['pandas'])
         if self.timeframe.to_timedelta < timedelta(days=1):
             full_range = pd.date_range(start=df.index.min(), end=df.index.max(), freq=self.timeframe.pandas)
+            if df.index.duplicated().sum() > 0:
+                df = df.loc[~df.index.duplicated()] # Drop duplicates index in case there are any
             df = df.reindex(full_range, fill_value=None)
             df[['volume', 'transactions']] = df[['volume', 'transactions']].fillna(0)
         df.drop('timestamp', axis=1, inplace=True)

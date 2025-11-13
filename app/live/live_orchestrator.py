@@ -61,7 +61,7 @@ class LiveOrchestrator:
             'L2': {'wait_seconds': 300, 'log_path': os.path.join(date_folder, 'L2_fetcher.log')}, 
             'fetch': {'wait_seconds': 2, 'log_path': os.path.join(date_folder, 'data_fetcher.log')}, 
             'enrich': {'wait_seconds': 2, 'log_path': os.path.join(date_folder, 'data_enricher.log')},
-            'orchestrator': {'wait_seconds': 5}
+            'orchestrator': {'wait_seconds': 10}
         }
     
     def _launch_process(self, target, args=(), new_terminal=True, log_path=None, tail_logs=True):

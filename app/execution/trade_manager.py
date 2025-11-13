@@ -426,7 +426,7 @@ class TradeManager:
         #     df = pd.DataFrame()
         valid_results = enricher.get_valid_result(results)
 
-        return valid_results['df']
+        return valid_results['df'] if valid_results else pd.DataFrame()
     
     def load_data_live(self, symbol, trig_time, to_time=None, file_format='parquet', block_add_sr=False):
 

@@ -26,7 +26,7 @@ class HistMarketDataHandler:
         market_cap = None
         try:
             market_cap = helpers.convert_large_numbers(helpers.get_stock_info_from_Finviz(symbol, 'Market Cap'))
-            share_floats = helpers.get_share_floats_from_polygon(symbol)
+            share_floats = helpers.get_share_floats_from_polygon(symbol) or ''
         except Exception as e:
                 print(f"Could not fetch market cap for {symbol}. Error: {e}")
         timeframe = helpers.get_df_timeframe(df)
