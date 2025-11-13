@@ -40,7 +40,7 @@ class TargetHandler(ABC):
     Abstract base class for handling different types of post-trigger targets (time-based, event-based, etc.).
     """
     def __init__(self):
-        self.target_column = None
+        self.target_str = None
         self.required_columns = []
 
     @abstractmethod
@@ -86,10 +86,10 @@ class TimeDeltaTargetHandler(TargetHandler):
         self.delta = delta
         self.timezone = timezone
         self.entry_time = None
-        self.target_column = None
+        self.target_str = str(self.delta.total_seconds() / 60) + 'min'
         self.required_columns = []
 
-    def get_target_time(self,  df:pd.DataFrame, trigger_time:pd.Timestamp) -> pd.Timestamp:
+    def get_target_time(self, df:pd.DataFrame, trigger_time:pd.Timestamp) -> pd.Timestamp:
         return resolve_max_time(trigger_time, self.delta, self.timezone)
     
     def get_target_event(self, prev_row:pd.Series, curr_row:pd.Series, entry_time:pd.Timestamp=None) -> Optional[str]:
@@ -117,7 +117,7 @@ class EODTargetHandler(TargetHandler):
         self.end_time = 'eod_rth' if rth_only else 'eod'
         self.timezone = timezone
         self.entry_time = None
-        self.target_column = None
+        self.target_str = 'eodt'
         self.required_columns = []
 
     def get_target_time(self, df:pd.DataFrame, trigger_time:pd.Timestamp) -> pd.Timestamp:
@@ -142,7 +142,7 @@ class FixedTargetHandler(TargetHandler):
         self.target_price = target_price
         self.max_time = max_time
         self.timezone = timezone
-        self.target_column = None
+        self.target_str = 'fixed'
         self.required_columns = []
 
     def get_target_time(self,  df:pd.DataFrame, trigger_time:pd.Timestamp) -> pd.Timestamp:
@@ -158,15 +158,15 @@ class VWAPCrossTargetHandler(TargetHandler):
         self.timezone = timezone
         self.entry_time = None
         self.timeframe = timeframe or Timeframe()
-        self.target_column = f'vwap_{self.timeframe}'
-        self.required_columns = [self.target_column]
+        self.target_str = f'vwap_{self.timeframe}'
+        self.required_columns = [self.target_str]
 
     def set_entry_time(self, time:pd.Timestamp):
         self.entry_time = time
 
     def get_target_time(self, df:pd.DataFrame, trigger_time:pd.Timestamp) -> pd.Timestamp:
         if f'vwap_{self.timeframe}' not in df.columns:
-            raise ValueError(f"{self.target_column} column not found in dataframe")
+            raise ValueError(f"{self.target_str} column not found in dataframe")
 
         if trigger_time not in df.index:
             raise ValueError(f"trigger_time {trigger_time} not found in dataframe index")
@@ -181,10 +181,10 @@ class VWAPCrossTargetHandler(TargetHandler):
             return trigger_time
 
         trig_close = df.at[trigger_time, 'close']
-        trig_vwap = df.at[trigger_time, self.target_column]
+        trig_vwap = df.at[trigger_time, self.target_str]
         direction = np.sign(trig_close - trig_vwap)
 
-        vwap_diff = post_df['close'] - post_df[self.target_column]
+        vwap_diff = post_df['close'] - post_df[self.target_str]
         sign_diff = vwap_diff.apply(np.sign).diff()
 
         cross_rows = post_df[sign_diff == -2 * direction]
@@ -195,18 +195,18 @@ class VWAPCrossTargetHandler(TargetHandler):
             return post_df.index[-1]
 
     def get_target_event(self, prev_row:pd.Series, curr_row:pd.Series) -> Optional[str]:
-        if self.target_column not in curr_row or prev_row is None or self.target_column not in prev_row:
+        if self.target_str not in curr_row or prev_row is None or self.target_str not in prev_row:
             return None
 
         max_target_time = resolve_max_time(self.entry_time, self.max_time, timezone=self.timezone)
 
-        prev_diff = prev_row['close'] - prev_row[self.target_column]
-        curr_diff = curr_row['close'] - curr_row[self.target_column]
+        prev_diff = prev_row['close'] - prev_row[self.target_str]
+        curr_diff = curr_row['close'] - curr_row[self.target_str]
 
         if curr_row['date'] > max_target_time:
             return 'max_time_overshoot'
         if np.sign(prev_diff) != np.sign(curr_diff):
-            return f'{self.target_column}_cross_exit'
+            return f'{self.target_str}_cross_exit'
         return None
 
 

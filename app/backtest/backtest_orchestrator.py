@@ -30,7 +30,7 @@ class BacktestOrchestrator:
         self.all_trades = []
 
     def setup_paths(self):
-        self.file_name_pattern = f"{self.engine_type}_{self.manager.strategy_name}_{self.manager.config.model_type}_{self.manager.config.selector_type}_{self.mode}_{self.manager.strategy_instance.timeframe}_seed{self.seed}_{self.manager.strategy_instance.target_handler.target_column}_{self.manager.config.stop}_pred{str(self.manager.config.pred_th)}"
+        self.file_name_pattern = f"{self.engine_type}_{self.manager.strategy_name}_{self.manager.config.model_type}_{self.manager.config.selector_type}_{self.mode}_{self.manager.strategy_instance.timeframe}_seed{self.seed}_{self.manager.strategy_instance.target_handler.target_str}_{self.manager.config.stop}_pred{str(self.manager.config.pred_th)}"
         base_folder = PATHS.folders_path['strategies_data']
         self.outputs_folder = os.path.join(base_folder, self.manager.strategy_name, f'backtest_{self.file_name_pattern}')
         # self.data_folder = os.path.join(base_folder, 'backtest_data')

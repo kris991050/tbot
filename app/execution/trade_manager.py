@@ -98,7 +98,7 @@ class TradeManager:
         return stop_hdlr
 
     def _load_models(self):
-        target = self.strategy_instance.target_handler.target_column
+        target = self.strategy_instance.target_handler.target_str
         trainer = ml_trainer.ModelTrainer(model_type=self.config.model_type, selector_type=self.config.selector_type,
                                                strategy_name=self.strategy_name, target=target)
         trainer.load()
@@ -292,7 +292,7 @@ class TradeManager:
 
     def _evaluate_RRR(self, curr_row, stop_price):
         # Assess Risk to Reward Ratio
-        target = curr_row[self.strategy_instance.target_handler.target_column]
+        target = curr_row[self.strategy_instance.target_handler.target_str]
         expected_reward = abs(target - curr_row['close']) if target and target > 0 else None
         risk = abs(curr_row['close'] - stop_price) if stop_price and stop_price > 0 else None
         rrr = expected_reward / risk if risk and expected_reward else float('inf')
@@ -356,7 +356,7 @@ class TradeManager:
             trigger_cols = [col for col in self.strategy_instance.required_columns if not any(keyword in col for keyword in ['open', 'high', 'low', 'volume'])]
             print(f"\nEntry conditions triggered at {row['date']}")#.\nTriggers: {row[trigger_cols]}")
             print(f"Prediction: {row.get('model_prediction'):.2f} (threshold: {self.config.pred_th})")
-            print(f"RRR: {rrr} (close: {row['close']:.2f} | stop price: {stop_price}) | target price: {row[self.strategy_instance.target_handler.target_column]:.2f} | threshold: {self.config.rrr_threshold}")
+            print(f"RRR: {rrr} (close: {row['close']:.2f} | stop price: {stop_price}) | target price: {row[self.strategy_instance.target_handler.target_str]:.2f} | threshold: {self.config.rrr_threshold}")
         if not expand:
             return is_triggered and is_predicted and is_RRR
         else:

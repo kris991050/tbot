@@ -163,7 +163,7 @@ class StrategyAnalyzer:
             'timeframe': df.attrs['timeframe'],
             'timeframe_min': timeframe_min,
             'strategy': trigger_column,
-            'target': target_handler.target_column,
+            'target': target_handler.target_str,
             'data_to_time': df.attrs['data_to_time'],
             'data_from_time': df.attrs['data_from_time'],
             'trig_time': trigger_time,
