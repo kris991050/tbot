@@ -1,0 +1,41 @@
+# Examples:
+# ---------
+# Ignore all .log files
+#*.log
+
+# Ignore the 'temp' directory
+#temp/
+
+# Ignore a specific file
+#config.json
+
+# Ignore all files in the 'build' directory, but not the directory itself
+#build/*
+
+# Ignore all files ending with .tmp, but include important.tmp
+#*.tmp
+#!important.tmp
+
+
+archive/
+.DS_Store
+./*
+._*
+*.ods
+*.csv
+__*
+*_copy*
+*_backup*
+*_old*
+__pycache__/
+*.pyc
+*.pyo
+.env/
+.venv/
+venv/
+.pytest_cache/
+*.log
+*.sqlite3
+*.db
+*.pem
+.vscode/

@@ -1,0 +1,11 @@
+version: "3.8"
+services:
+  python_trading:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    stdin_open: true
+    tty: true
+    volumes:
+      - .:/app/
+      # - /Users/user/Documents/Medias:/app/Medias

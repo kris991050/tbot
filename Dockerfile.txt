@@ -1,0 +1,18 @@
+#FROM python:latest
+FROM ubuntu
+RUN apt-get update && apt-get install -y iputils-ping
+CMD bash
+
+FROM python:3-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade -r /app/requirements.txt
+RUN pip install ib_insync
+
+
+COPY . .
+
+ENTRYPOINT ["python3"]
+CMD [ "trading.py" ]
