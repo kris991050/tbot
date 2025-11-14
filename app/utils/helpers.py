@@ -7,7 +7,6 @@ from ib_insync import *
 current_folder = os.path.dirname(os.path.realpath(__file__))
 parent_folder = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_folder)
-# sys.path.append(current_folder)
 from miscellaneous import newsScraper
 from utils.timeframe import Timeframe
 from utils.constants import CONSTANTS, PATHS, FORMATS
@@ -31,12 +30,6 @@ def sleep_display(time_wait, ib=None):
         print("\r{} seconds.".format(time_wait - i), end='')
         if not ib: time.sleep(1)
         else: ib.sleep(1)
-
-# def print_timer(msg, overwrite=False, log_intermediate=False):
-#     if sys.stdout.isatty() and overwrite:
-#         print(f"\r{msg}", end='', flush=True)
-#     elif log_intermediate or not overwrite:
-#         print(msg, flush=True)
 
 
 def get_page(url):
@@ -67,8 +60,7 @@ def convert_large_numbers(number_text):
     return float(number_text)
 
 
-def IBKRConnect_any(ib:IB=IB(), paper:bool=True, client_id:int=None, remote:bool=False):
-    # remote = True
+def IBKRConnect_any(ib:IB=IB(), paper:bool=True, client_id:int=None, remote:bool=True):
     ib, ibConnection = IBKRConnect(ib, paper=paper, client_id=client_id, remote=remote)
     if not ibConnection:
         ib, ibConnection = IBKRConnect(IB(), paper=not paper, client_id=client_id, remote=remote)
@@ -76,7 +68,7 @@ def IBKRConnect_any(ib:IB=IB(), paper:bool=True, client_id:int=None, remote:bool
     return ib, ib.isConnected()
 
 
-def IBKRConnect(ib:IB=IB(), paper:bool=True, client_id:int=None, remote:bool=False):
+def IBKRConnect(ib:IB=IB(), paper:bool=True, client_id:int=None, remote:bool=True):
     ib_ip = CONSTANTS.IB_IP_REMOTE if remote else CONSTANTS.IB_IP_LOCAL
     port_number = CONSTANTS.IB_PORT_PAPER if paper else CONSTANTS.IB_PORT_LIVE
     max_clientId = 10 if not client_id else 1
@@ -206,33 +198,9 @@ def path_current_setup(path_current_file, ch_dir=True, print_path=True):
     return path_current
 
 
-# def construct_hist_data_path(local_hist_folder, symbol, timeframe, to_time, from_time, file_format='csv'):
-
-#     # return str(local_hist_folder) + '/hist_data_' + symbol + '_' + timeframe + '_' + duration + '.csv'
-#     to_time = pd.to_datetime(to_time, utc=True).tz_convert(CONSTANTS.TZ_WORK)
-#     from_time = pd.to_datetime(from_time, utc=True).tz_convert(CONSTANTS.TZ_WORK)
-
-#     start_str = to_time.strftime(FORMATS.MKT_DATA_FILENAME_DATETIME_FMT)
-#     end_str = from_time.strftime(FORMATS.MKT_DATA_FILENAME_DATETIME_FMT)
-
-#     filename = f"hist_data_{symbol}_{timeframe}_{end_str}_{start_str}.{file_format}"
-#     return os.path.join(local_hist_folder, filename)
-
-#     # return str(local_hist_folder) + '/hist_data_' + symbol + '_' + timeframe + '_' + pd.to_datetime(from_time).strftime('%Y-%m-%d-%H-%M-%S') + '_' + pd.to_datetime(to_time).strftime('%Y-%m-%d-%H-%M-%S') + '.csv'
-#     # return str(local_hist_folder) + '/hist_data_' + symbol + '_' + timeframe + '_' + from_time + '_' + to_time + '.csv'
-
 def construct_data_path(local_hist_folder, symbol, timeframe, to_time, from_time, file_format='csv', data_type='hist_data'):
     filename = FORMATS.construct_filename(symbol=symbol, timeframe=timeframe, to_time=to_time, from_time=from_time, file_format=file_format, data_type=data_type)
     return os.path.join(local_hist_folder, filename)
-
-
-# def build_hist_data_filename_pattern(timeframe: str='1 min', file_format: str='csv') -> re.Pattern:
-#     date_regex = FORMATS.MKT_DATA_FILENAME_DATETIME_REGEX
-#     return re.compile(
-#         rf"^hist_data_(?P<symbol>[A-Z]+)_{timeframe}_"
-#         rf"(?P<end>{date_regex})_"
-#         rf"(?P<start>{date_regex})\.{file_format}$"
-#     )
 
 
 def build_data_filename_pattern(timeframe:Timeframe=None, file_format:str=None, data_type:str=None) -> re.Pattern:
@@ -253,41 +221,6 @@ def build_data_filename_pattern(timeframe:Timeframe=None, file_format:str=None, 
 
     return re.compile(f"^{pattern}$")
 
-# def build_hist_data_filename_pattern(timeframe:Timeframe=None, file_format:str=None) -> re.Pattern:
-#     timeframe = timeframe or Timeframe()
-#     file_format = file_format or FORMATS.DEFAULT_FILE_FORMAT
-
-#     date_regex = FORMATS.MKT_DATA_FILENAME_DATETIME_REGEX
-#     template = FORMATS.HIST_MKT_DATA_FILENAME_TEMPLATE
-
-#     pattern = template \
-#         .replace('.', r'\.') \
-#         .replace('{symbol}', r'(?P<symbol>[A-Z]+)') \
-#         .replace('{timeframe}', re.escape(timeframe.pandas)) \
-#         .replace('{from_str}', f"(?P<from_str>{date_regex})") \
-#         .replace('{to_str}', f"(?P<to_str>{date_regex})") \
-#         .replace('{file_format}', re.escape(file_format))
-
-#     return re.compile(f"^{pattern}$")
-
-
-# def build_enriched_data_filename_pattern(timeframe:Timeframe=None, file_format:str=None) -> re.Pattern:
-#     timeframe = timeframe or Timeframe()
-#     file_format = file_format or FORMATS.DEFAULT_FILE_FORMAT
-
-#     date_regex = FORMATS.MKT_DATA_FILENAME_DATETIME_REGEX
-#     template = FORMATS.ENRICHED_MKT_DATA_FILENAME_TEMPLATE
-
-#     pattern = template \
-#         .replace('.', r'\.') \
-#         .replace('{symbol}', r'(?P<symbol>[A-Z]+)') \
-#         .replace('{timeframe}', re.escape(timeframe.pandas)) \
-#         .replace('{from_str}', f"(?P<from_str>{date_regex})") \
-#         .replace('{to_str}', f"(?P<to_str>{date_regex})") \
-#         .replace('{file_format}', re.escape(file_format))
-
-#     return re.compile(f"^{pattern}$")
-
 
 def save_json(obj, path, lock=False):
     if lock:
@@ -298,17 +231,6 @@ def save_json(obj, path, lock=False):
     else:
         with open(path, 'w') as f:
             json.dump(obj, f, indent=2, default=str)  # str conversion for datetimes
-
-
-# def load_json(path, lock=False):
-#     if lock:
-#         lock_file = filelock.FileLock(f"{path}.lock")
-#         with lock_file:  # Acquires the lock here
-#             with open(path, 'r') as f:
-#                 return json.load(f)
-#     else:
-#         with open(path, 'r') as f:
-#             return json.load(f)
 
 
 def load_json(path, lock=False, lock_timeout=10):
@@ -368,25 +290,6 @@ def read_csv_file(file_csv_path):
     return rows_list
 
 
-# def read_data_file(file_path: str):
-
-#     path = pathlib.Path(file_path)
-#     ext = path.suffix.lower().lstrip('.')
-
-#     if ext not in FORMATS.DATA_FILE_FORMATS_LIST:
-#         raise ValueError(f"Unsupported file extension: .{ext}")
-
-#     if ext in FORMATS.DATA_FILE_FORMATS['csv']:
-#         return pd.read_csv(path)
-#     elif ext in FORMATS.DATA_FILE_FORMATS['pickle']:
-#         return pd.read_pickle(path)
-#     elif ext in FORMATS.DATA_FILE_FORMATS['parquet']:
-#         return pd.read_parquet(path)
-#     else:
-#         # This branch shouldn't be reached due to the check above
-#         raise ValueError(f"Unhandled file extension: .{ext}")
-
-
 def change_file_format(file_path: typing.Union[str, os.PathLike], format_to: str) -> str:
     """
     Change the file extension of the given file path to the desired format.
@@ -430,53 +333,6 @@ def detect_file_encoding(filepath, verbose=False):
     return result
 
 
-# def check_existing_mkt_data_file(symbol, timeframe, folder, delete_file=False, file_format='csv'):
-
-#     df, to_time, from_time, file_path = pd.DataFrame(), None, None, None
-
-#     if file_format not in FORMATS.DATA_FILE_FORMATS_LIST:
-#         print(f"Format must be {FORMATS.DATA_FILE_FORMATS_LIST}.")
-#         return df, to_time, from_time, file_path
-
-#     if not os.path.isdir(folder):
-#         print(f"{folder} is not a directory")
-#         return df, to_time, from_time, file_path
-
-#     file_ext = '.' + file_format
-#     filename_pattern = build_hist_data_filename_pattern(timeframe, file_format=file_format)
-
-#     for file in os.listdir(folder):
-#         if not file.endswith(file_ext):
-#             continue
-
-#         match = filename_pattern.match(file)
-#         if match and match.group("symbol") == symbol:
-#             file_path = os.path.join(folder, file)
-
-#             # to_time = pd.to_datetime(match.group("start")).strftime(FORMATS.MKT_DATA_FILENAME_DATETIME_FMT)
-#             to_time = pd.to_datetime(match.group("start"),
-#                                         format=FORMATS.MKT_DATA_FILENAME_DATETIME_FMT,
-#                                         utc=True).tz_convert(CONSTANTS.TZ_WORK)
-#             # from_time = pd.to_datetime(match.group("end")).strftime(FORMATS.MKT_DATA_FILENAME_DATETIME_FMT)
-#             from_time = pd.to_datetime(match.group("end"),
-#                                     format=FORMATS.MKT_DATA_FILENAME_DATETIME_FMT,
-#                                     utc=True).tz_convert(CONSTANTS.TZ_WORK)
-
-#             df = load_df_from_file(file_path)
-#             df = format_df_date(df)
-
-#             # df_matched_list.append({'df': df, 'to_time': to_time, 'from_time': from_time, 'file_path': file_path})
-
-#             break  # Exit after first match
-
-
-#         if delete_file:
-#             os.remove(file_path)
-#             print("Removed file", file_path)
-
-#     return df, to_time, from_time, file_path
-
-
 def check_existing_data_file(symbol:str, timeframe:Timeframe, folder:str, data_type:str, delete_file:bool=False, file_format:str=None):
 
     df, to_time, from_time, file_path = pd.DataFrame(), None, None, None
@@ -492,24 +348,14 @@ def check_existing_data_file(symbol:str, timeframe:Timeframe, folder:str, data_t
     matched_files = []
     file_formats = FORMATS.DATA_FILE_FORMATS_LIST if not file_format else [file_format]
     data_type_formats = FORMATS.DATA_TYPE_FORMATS
-    # if data_type == 'hist':
-    #     file_formats = FORMATS.DATA_FILE_FORMATS_LIST if not file_format else [file_format]
-    # elif data_type == 'enriched':
-    #     file_formats = FORMATS.ENRICHED_MKT_DATA_FILENAME_TEMPLATE if not file_format else [file_format]
-    # else: file_formats = []
 
     for file_format in file_formats:
         file_ext = '.' + file_format
 
         if data_type in data_type_formats:
             filename_pattern = build_data_filename_pattern(timeframe, file_format=file_format, data_type=data_type)
-        # if data_type == 'hist':
-        #     filename_pattern = build_data_filename_pattern(timeframe, file_format=file_format)
-        # elif data_type == 'enriched':
-        #     filename_pattern = build_data_filename_pattern(timeframe, file_format=file_format)
         else:
             raise ValueError(f"Unsupported data type '{data_type}'. Supported: {data_type_formats}")
-            # filename_pattern = None
 
         for file in os.listdir(folder):
             if not file.endswith(file_ext):
@@ -547,72 +393,6 @@ def check_existing_data_file(symbol:str, timeframe:Timeframe, folder:str, data_t
         print(f"Removed file {selected['file_path']}")
 
     return df, selected['to_time'], selected['from_time'], selected['file_path']
-
-
-# def check_existing_enriched_data_file(symbol, timeframe, folder, file_format=None):
-#     df, to_time, from_time, file_path = pd.DataFrame(), None, None, None
-#     if file_format and file_format not in FORMATS.DATA_FILE_FORMATS_LIST:
-#         print(f"Format must be {FORMATS.DATA_FILE_FORMATS_LIST}.")
-#         return df, to_time, from_time, file_path
-
-#     if not os.path.isdir(folder):
-#         print(f"{folder} is not a directory")
-#         return df, to_time, from_time, file_path
-
-#     matched_files = []
-#     file_formats = FORMATS.DATA_FILE_FORMATS_LIST if not file_format else [file_format]
-
-#     for file_format in file_formats:
-#         file_ext = '.' + file_format
-#         filename_pattern = build_hist_data_filename_pattern(timeframe, file_format=file_format)
-
-#         for file in os.listdir(folder):
-#             if not file.endswith(file_ext):
-#                 continue
-#             match = filename_pattern.match(file)
-#             if match and match.group("symbol") == symbol and 'enriched' in file:
-#                 current_file_path = os.path.join(folder, file)
-#                 current_to_time = pd.to_datetime(match.group("start"), format=FORMATS.MKT_DATA_FILENAME_DATETIME_FMT,
-#                                                     utc=True).tz_convert(CONSTANTS.TZ_WORK)
-#                 current_from_time = pd.to_datetime(match.group("end"), format=FORMATS.MKT_DATA_FILENAME_DATETIME_FMT,
-#                                                   utc=True).tz_convert(CONSTANTS.TZ_WORK)
-#                 matched_files.append({
-#                     'file_path': current_file_path,
-#                     'to_time': current_to_time,
-#                     'from_time': current_from_time,
-#                     'file_format': file_format,
-#                     'time_range': current_to_time - current_from_time
-#                 })
-
-#     if not matched_files:
-#         return df, to_time, from_time, file_path
-
-#     selected = max(matched_files, key=lambda x: x['time_range'])
-
-#     df = load_df_from_file(selected['file_path'])
-#     df = format_df_date(df)
-
-#     return df, selected['to_time'], selected['from_time'], selected['file_path']
-
-    # if format in ['csv', 'pkl', 'parquet']:
-
-    #     l = len(format)
-    #     file_extension = '.' + format
-    #     for file in os.listdir(folder):
-    #         if (symbol + '_' + timeframe + '_') in file and file_extension in file:
-    #             file_path = os.path.join(folder, file)
-    #             to_time = date_to_EST_aware(datetime.fromisoformat(str(file[-(l+20):-(l+10)] + 'T' + file[-(l+9):-(l+7)] + ':' + file[-(l+6):-(l+4)] + ':' + file[-(l+3):-(l+1)]) + '.000000'))
-    #             from_time = date_to_EST_aware(datetime.fromisoformat(str(file[-(l+40):-(l+30)] + 'T' + file[-(l+29):-(l+27)] + ':' + file[-(l+26):-(l+24)] + ':' + file[-(l+23):-(l+21)]) + '.000000'))
-    #             # df = pd.read_csv(file_path)
-    #             df = load_df_from_file(file_path)
-    #             df = format_df_date(df)
-    #             if delete_file:
-    #                 os.remove(file_path)
-    #                 print("Removed file ", file_path)
-
-    # else: print("Format must be 'csv' or 'pkl'.")
-
-    # return df, to_time, from_time, file_path
 
 
 def save_df_to_file(df, data_path, file_format='csv'):
@@ -653,30 +433,6 @@ def save_df_to_file(df, data_path, file_format='csv'):
                     print("\nData file created at " + data_path + "\n")
                 else:
                     print("\nWrong file format for ", file_format,  " and / or ", data_path + "\n")
-
-
-# def load_df_from_file(filepath, **kwargs):
-#     """
-#     Load a DataFrame from a file by automatically detecting the format
-#     based on the file extension (.csv, .pkl, .parquet).
-
-#     Parameters:
-#         filepath (str): Path to the input file.
-#         **kwargs: Additional arguments passed to the read function.
-
-#     Returns:
-#         pd.DataFrame: Loaded DataFrame.
-#     """
-#     ext = os.path.splitext(filepath)[1].lower()
-
-#     if ext == '.csv':
-#         return pd.read_csv(filepath, low_memory=False, **kwargs)
-#     elif ext in ['.pkl', '.pickle']:
-#         return pd.read_pickle(filepath)
-#     elif ext == '.parquet':
-#         return pd.read_parquet(filepath, **kwargs)
-#     else:
-#         raise ValueError(f"Unsupported file extension '{ext}'. Supported: .csv, .pkl, .parquet")
 
 
 def load_df_from_file(filepath, **kwargs):
@@ -771,28 +527,13 @@ def date_local_to_EST(date):
     date_local = timezone_local.localize(date)
     date_EST = datetime.fromisoformat(str(date_local)).astimezone(tz=timezone_EST)
 
-    # time_now_local = datetime.now(tz=timezone_local)
-    # date = datetime.fromisoformat(str(date) + str(time_now_local)[-6:])#.replace(tzinfo=pytz.timezone(timezone_local))
-    # date_EST = datetime.fromisoformat(str(date)).astimezone(tz=CONSTANTS.TZ_WORK)
-
     return date_EST
 
 
 def date_to_EST_aware(date, reverse=False):
     timezone_EST = CONSTANTS.TZ_WORK
 
-    # date_now = datetime.now().strftime('%Y-%m-%d')
-    # date_start_DST = datetime(2024,3,10).strftime('%Y-%m-%d')
-    # date_end_DST = datetime(2024,11,3).strftime('%Y-%m-%d')
-
-    # DST_offset = 0 if (date_now > date_start_DST or date_now <= date_end_DST) else 1
-    # local_offset = -5 + DST_offset
-    # extra_zero = "0" if local_offset < 10 else ""
-    # sign_offset = "-" if local_offset < 0 else ""
-    # local_offset_str = sign_offset + extra_zero + str(abs(local_offset)) + ":00"
-
     if not reverse:
-        # newDate = datetime.fromisoformat(str(date) + local_offset_str).astimezone(tz=CONSTANTS.TZ_WORK)
         newDate = timezone_EST.localize(date)
     else:
         newDate = datetime.fromisoformat(str(date)[:-6])
@@ -876,17 +617,6 @@ def get_dates_list(start_date: datetime.date, end_date: datetime.date):
     return date_range
 
 
-# def get_market_holidays(year, exchange='NYSE'):
-#     # Get the market calendar for the exchange (default: NYSE)
-#     market = pandas_market_calendars.get_calendar(exchange)
-
-#     # Get the market's schedule for the year
-#     schedule = market.sessions_in_range(pd.Timestamp(f'{year}-01-01'), pd.Timestamp(f'{year}-12-31'))
-
-#     # Convert the schedule to a list of holiday dates
-#     holidays = pd.to_datetime(market.holidays().holidays)
-#     return holidays
-
 def get_market_holidays(start_date, end_date, exchange='NYSE'):
     # Get the market calendar for the specified exchange (default: NYSE)
     market = pandas_market_calendars.get_calendar(exchange)
@@ -899,6 +629,12 @@ def get_market_holidays(start_date, end_date, exchange='NYSE'):
 
     # Return as a pandas datetime index
     return pd.to_datetime(holidays_in_range)
+
+
+def is_between_market_times(start_label, end_label, timezone=None):
+    timezone = timezone or CONSTANTS.TZ_WORK
+    now = pd.Timestamp.now(tz=timezone).time()
+    return CONSTANTS.TH_TIMES[start_label] < now < CONSTANTS.TH_TIMES[end_label]
 
 
 
@@ -1077,38 +813,6 @@ def categorize_market_cap(market_cap: float):
 # ======================
 
 
-# def check_data_from_df(df, symbol, timeframe, query_time, duration, indicators_list):
-
-#     df_timeframe = datetime.fromisoformat(str(df['date'].iloc[-1])) - datetime.fromisoformat(str(df['date'].iloc[-2]))
-#     df_duration = datetime.fromisoformat(str(df['date'].iloc[-1])) - datetime.fromisoformat(str(df['date'].iloc[0]))
-
-#     # Check timeframe
-#     tfww, tfdd, tfhh, tfmm, tfss = 0, 0, 0, 0, 0
-#     if 'sec' in timeframe: tfss = int(timeframe.rsplit(' ')[0])
-#     elif 'min' in timeframe: tfmm = int(timeframe.rsplit(' ')[0])
-#     elif 'hour' in timeframe: tfhh = int(timeframe.rsplit(' ')[0])
-#     elif 'day' in timeframe: tfdd = int(timeframe.rsplit(' ')[0])
-#     elif 'week' in timeframe: tfww = int(timeframe.rsplit(' ')[0])
-#     elif 'month' in timeframe: tfdd = int(timeframe.rsplit(' ')[0]) * 20
-#     timeframe = timedelta(weeks=tfww, days=tfdd, hours=tfhh, minutes=tfmm, seconds=tfss)
-
-#     # Check duration
-#     dww, ddd, dhh, dmm, dss = 0, 0, 0, 0, 0
-#     if 'S' in duration: dss = int(duration.rsplit(' ')[0])
-#     elif 'D' in duration: ddd = int(duration.rsplit(' ')[0])
-#     elif 'W' in duration: ddd = int(duration.rsplit(' ')[0]) * 5
-#     elif 'M' in duration: ddd = int(duration.rsplit(' ')[0]) * 20
-#     elif 'Y' in duration: ddd = int(duration.rsplit(' ')[0]) * 52 * 5
-#     duration = timedelta(weeks=dww, days=ddd, hours=dhh, minutes=dmm, seconds=dss)
-
-#     # Check query_time and indicators included
-#     query_time_conform = query_time < datetime.fromisoformat(str(df['date'].iloc[-1])) + timeframe and query_time > datetime.fromisoformat(str(df['date'].iloc[0]))
-#     indicators_conform = set(list(map(lambda x: 'pdc' if x == 'levels' else x, indicators_list))).issubset(df.columns)
-#     df_conform = timeframe == df_timeframe and duration <= df_duration and query_time_conform and indicators_conform
-
-#     return df_conform
-
-
 def get_previous_date_from_df(df, query_time, day_offset):
 
     query_time_adjusted = adjust_time_to_df(df, query_time)
@@ -1171,10 +875,11 @@ def df_to_table(df, title=None):
 
 
 def display_df(df, columns_list=['date', 'close'], date_ranges=[], conditions_list=[]):
-
-    # Filters a DataFrame by multiple date ranges and displays selected columns.
-    # Example of date_ranges: date_ranges = [['2025-04-10T00:00:00', '2025-04-11T20:59:59'], ['2025-03-05T00:00:00', '2025-03-09T20:59:59']]
-    # conditions_list contains column names to be True
+    '''
+    Filters a DataFrame by multiple date ranges and displays selected columns.
+    Example of date_ranges: date_ranges = [['2025-04-10T00:00:00', '2025-04-11T20:59:59'], ['2025-03-05T00:00:00', '2025-03-09T20:59:59']]
+    conditions_list contains column names to be True
+    '''
 
     df = format_df_date(df)
     date_ranges = [[date_to_EST_aware(pd.to_datetime(date)) for date in date_range] for date_range in date_ranges]
@@ -1184,11 +889,6 @@ def display_df(df, columns_list=['date', 'close'], date_ranges=[], conditions_li
         for date_range in date_ranges:
             date_mask |= (df['date'] >= pd.to_datetime(date_range[0])) & (df['date'] <= pd.to_datetime(date_range[1]))
         df = df[date_mask]
-
-    # Apply condition filters
-    # for condition_col in conditions_list:
-    #     if condition_col in df.columns:
-    #         df = df[df[condition_col] == True]
 
     if conditions_list:
         condition_mask = pd.Series(False, index=df.index)
@@ -1410,35 +1110,6 @@ def merge_df_with_dask(df:pd.DataFrame, df2:pd.DataFrame, on:str, how:str='left'
     return merged_df
 
 
-
-
-
-# def get_df_timeframe(df):
-
-#     if df.empty:
-#         return None
-
-#     # Make sure date column is in datetime format
-#     df = format_df_date(df)
-
-#     time_diffs = df['date'].diff().dropna()    # Get the time differences between consecutive rows
-#     most_common_diff = time_diffs.mode()[0]    # Get the most common frequency (mode) of time differences
-
-#     seconds = most_common_diff.total_seconds()
-
-#     sec_to_tf = CONSTANTS.SECONDS_TO_INTRADAY_TIMEFRAME
-
-#     if str(seconds) in sec_to_tf.keys():
-#         timeframe = (next((value for key, value in sec_to_tf.items() if key == str(seconds)), None))
-#     else:
-#         if most_common_diff == timedelta(days=1): timeframe = '1 day'
-#         elif most_common_diff == timedelta(weeks=1): timeframe = '1 week'
-#         elif timedelta(weeks=4) <= most_common_diff < timedelta(weeks=5) : timeframe = '1 month'
-#         else: timeframe = None
-
-#     return timeframe
-
-
 def get_df_timeframe(df):
     """
     Detects the most common frequency of a dataframe's datetime index or 'date' column
@@ -1645,769 +1316,7 @@ def extract_timeframe_from_df_column(s):
         return s.split('_')[-1]
 
 
-# # ======================
-# # Indicators
-# # ======================
-
-
-# def get_indicator(df, indicator, query_time):
-
-#     query_time_df = adjust_time_to_df(df, query_time)
-#     ind = ''
-
-#     try:
-#         if indicator == 'pivots' or indicator == 'pivots_D' or indicator == 'pivots_M':
-#             ind = {}
-#             if indicator == 'pivots': pivots_list = ['s1', 's2', 's3', 's4', 's5', 's6', 'r1', 'r2', 'r3', 'r4', 'r5', 'r6']
-#             elif indicator == 'pivots_D': pivots_list = ['s1_D', 's2_D', 's3_D', 's4_D', 's5_D', 's6_D', 'r1_D', 'r2_D', 'r3_D', 'r4_D', 'r5_D', 'r6_D']
-#             elif indicator == 'pivots_M': pivots_list = ['s1_M', 's2_M', 's3_M', 's4_M', 's5_M', 's6_M', 'r1_M', 'r2_M', 'r3_M', 'r4_M', 'r5_M', 'r6_M']
-#             for p in pivots_list:
-#                 ind[p] = df.loc[df['date'] == query_time_df, p].iloc[0]
-#         else:
-#             ind = df.loc[df['date'] == query_time_df, indicator].iloc[0]
-
-#     except Exception as e: print("Could not fetch ", indicator, ". Error: ", e, "  |  Full error: ", traceback.format_exc())
-
-#     return ind
-
-
-# def get_CPR(df, query_time, pivots):
-
-#     char = '_D' if '_D' in list(pivots.keys())[0] else ''
-
-#     # Get CPR size and level comparisons
-#     cpr_size_to_yst_perc, cpr_midpoint_to_yst_perc = '', ''
-#     try:
-#         query_time_yst = get_previous_date_from_df(df, query_time, day_offset=1)
-#         r2_yst, s2_yst = float(get_indicator(df, 'r2' + char, query_time_yst)), float(get_indicator(df, 's2' + char, query_time_yst))
-#         cpr_size_to_yst_perc = round(((pivots['r2' + char] - pivots['s2' + char]) * 100 / (r2_yst - s2_yst)) - 100, 1)
-#         cpr_midpoint_to_yst_perc = round((0.5 * (pivots['s2' + char] + pivots['r2' + char]) * 100 / (0.5 * (s2_yst + r2_yst))) - 100, 1)
-#     except Exception as e: print("Could not calculate CPR. Error: ", e, "  |  Full error: ", traceback.format_exc())
-
-#     return cpr_size_to_yst_perc, cpr_midpoint_to_yst_perc
-
-
-# def get_levels_by_resampling(df, levels, timeframe, df2=pd.DataFrame()):
-
-#         if df2.empty: df2 = df
-#         date_tf_col = 'date_' + timeframe
-
-#         # Resample data by day
-#         levels_aggregate = {}
-#         for l in levels: levels_aggregate[l['col']] = l['funct']
-
-#         df2_resampled = df2.resample(timeframe, on='date').agg(levels_aggregate).dropna().reset_index()
-#         # df2_resampled = df2.resample('ME' if timeframe == 'M' else timeframe, on='date').agg(levels_aggregate).dropna().reset_index()
-#         if timeframe == 'D': df2_resampled[date_tf_col] = df2_resampled['date'].dt.date
-#         elif timeframe == 'M': df2_resampled[date_tf_col] = df2_resampled['date'].dt.strftime('%Y-%m')
-
-#         # Shift to get previous day's data
-#         for l in levels: df2_resampled[l['name']] = df2_resampled[l['col']].shift(l['shift'])
-
-#         # Map the previous day's data to the original DataFrame
-#         levels_merge = [date_tf_col]
-#         for l in levels: levels_merge += [l['name']]
-
-#         df = pd.merge(df, df2_resampled[levels_merge], on=date_tf_col, how='left')
-
-#         return df
-
-
-# def get_supp_res(df, display_levels=False):
-
-#     # Make sure date column is in datetime format
-#     # df = format_df_date(df)
-
-#     df_levels = get_daily_df(df, th='rth', rename_volume=False)
-#     # df_levels = df.resample('W', on='date').agg({'open':'first', 'close':'last', 'high':'max', 'low':'min', 'volume':'sum'}).dropna(subset=['close']).reset_index()
-
-#     # Detect local peaks and troughs (resistance and support)
-#     peaks, _ = scipy.signal.find_peaks(df_levels['high'], distance=10, prominence=1)
-#     troughs, _ = scipy.signal.find_peaks(-df_levels['low'], distance=10, prominence=1)
-
-#     df_levels['is_peak'] = False
-#     df_levels['is_peak'].iloc[peaks] = True
-
-#     df_levels['is_trough'] = False
-#     df_levels['is_trough'].iloc[troughs] = True
-
-#     df_levels['swing_price'] = numpy.nan
-#     df_levels.loc[df_levels['is_peak'] == True, 'swing_price'] = df_levels['high']
-#     df_levels.loc[df_levels['is_trough'] == True, 'swing_price'] = df_levels['low']
-
-#     level_granularity = 5  # or a percentage if using crypto
-#     df_levels['rounded_level'] = df_levels['swing_price'].round(-int(numpy.log10(level_granularity)))
-
-#     # Only use peaks and troughs
-#     levels_df = df_levels[df_levels['is_peak'] | df_levels['is_trough']]
-#     level_counts = levels_df['rounded_level'].value_counts().sort_index()
-
-#     # Basic scoring based on reaction count
-#     significant_levels = level_counts[level_counts > 2 * level_counts.std()]
-
-#     # Calculate reversal strength
-#     look_forward_reaction = 10
-#     reaction_strengths = []
-#     for level in significant_levels.index:
-#         swing_points = levels_df[levels_df['rounded_level'] == level]
-#         for idx in swing_points.index:
-#             # look forward or backward N bars and measure max % move
-#             future_df_subset = df_levels.iloc[idx:idx+look_forward_reaction+1]
-#             future_price_max = future_df_subset['close'].max() if future_df_subset['is_trough'].iloc[0] else future_df_subset['close'].min() if future_df_subset['is_peak'].iloc[0] else None
-#             future_price_max_index = future_df_subset['close'].idxmax()
-#             future_volume_cum = df_levels['volume'].iloc[idx:future_price_max_index+1].sum()
-#             current_price = df_levels['close'].iloc[idx]
-#             pct_change = 100 * (future_price_max - current_price) / current_price
-#             date_change = df_levels['date'].iloc[idx].date()
-#             reaction_strengths.append((date_change, level, future_volume_cum, pct_change))
-
-#     # Aggregate strength
-#     df_levels_reaction = pd.DataFrame(reaction_strengths, columns=['date', 'level', 'cum_volume', 'pct_move']).sort_values(by='date', ascending=True)
-#     df_levels_ranking = df_levels_reaction.groupby('level').agg(level_count=('level', 'count'), last_date=('date', 'last'), mean_cum_volume=('cum_volume', 'mean'), mean_pct_move=('pct_move', 'mean')).sort_values(by='mean_pct_move', key=abs, ascending=False).reset_index()
-#     df_levels_ranking['date_score'] = (pd.to_datetime(df_levels_ranking['last_date']) - pd.to_datetime(df_levels_reaction['date'].max())).dt.days
-#     df_levels_ranking['mean_pct_move_abs'] = df_levels_ranking['mean_pct_move'].abs()
-
-#     # Normalize
-#     ranking_columns = ['level_count', 'date_score', 'mean_cum_volume', 'mean_pct_move_abs']
-#     normalized = sklearn.preprocessing.MinMaxScaler().fit_transform(df_levels_ranking[ranking_columns])
-#     df_normalized = pd.DataFrame(normalized, columns=[col + '_norm' for col in ranking_columns])
-#     df_levels_ranking = pd.concat([df_levels_ranking, df_normalized], axis=1)
-
-#     # df_levels_ranking['score'] = df_normalized.mean(axis=1) # Case equal weights
-#     weights = {'level_count': 0.25, 'date_score': 0.25, 'mean_cum_volume': 0.25, 'mean_pct_move_abs': 0.25}
-#     df_levels_ranking['weighted_score'] = sum(df_normalized[col+'_norm'] * weight for col, weight in weights.items())
-
-#     df_levels_ranking = df_levels_ranking.sort_values(by='weighted_score', ascending=False)#.reset_index(drop=True)
-
-#     print(df_levels_reaction)
-#     print()
-#     print(df_levels_ranking)
-
-#     # Display levels
-#     display_levels = True
-#     if display_levels:
-#         plt.figure(figsize=(14,6))
-#         plt.plot(df_levels['close'], label='Price')
-#         for level in df_levels_ranking['level'].head(10):
-#             plt.axhline(y=level, color='orange', linestyle='--', alpha=0.5)
-#         plt.legend()
-#         plt.title("Strong Support & Resistance Levels")
-#         plt.show()
-
-
-# def add_indicator(df, ib, contract, indicators_list):
-
-#     if df.shape[0] > 0:
-
-#         # Make sure date column is in datetime format
-#         # df = format_df_date(df)
-
-#         # Add day and month info columns
-#         df['date_D'] = df['date'].dt.date
-#         df['date_M'] = df['date'].dt.strftime('%Y-%m')
-
-#         # Add low and high of day
-#         df['low_of_day'] = df.groupby('date_D')['low'].cummin()
-#         df['high_of_day'] = df.groupby('date_D')['high'].cummax()
-
-#         if "emas" in indicators_list:
-#             indicator_ema9 = ta.trend.EMAIndicator(close=df["close"], window=9, fillna=False)
-#             df["ema9"] = indicator_ema9.ema_indicator()
-#             indicator_ema20 = ta.trend.EMAIndicator(close=df["close"], window=20, fillna=False)
-#             df["ema20"] = indicator_ema20.ema_indicator()
-#             indicator_sma50 = ta.trend.SMAIndicator(close=df["close"], window=50, fillna=False)
-#             df["sma50"] = indicator_sma50.sma_indicator()
-#             indicator_sma200 = ta.trend.SMAIndicator(close=df["close"], window=200, fillna=False)
-#             df["sma200"] = indicator_sma200.sma_indicator()
-
-#         if "vwap" in indicators_list:
-#             # Calculate window parameter as the average candle per day in the whole df
-#             window = int(numpy.floor((numpy.average([len(group) for date, group in df.groupby(df['date'].dt.date)]))))
-#             indicator_vwap = ta.volume.VolumeWeightedAveragePrice(high=df["high"], low=df["low"], close=df["close"], volume=df["volume"], window=window, fillna=False)
-#             df["vwap"] = indicator_vwap.volume_weighted_average_price()
-
-#         if "macd" in indicators_list:
-#             indicator_macd = ta.trend.MACD(close=df["close"], window_slow=26, window_fast=12, window_sign=9, fillna=False)
-#             df["macd"] = indicator_macd.macd()
-#             df['macd_signal'] = indicator_macd.macd_signal()
-#             df['macd_diff'] = indicator_macd.macd_diff()
-
-#         if "index" in indicators_list:
-
-#             # Get symbol related Index and ETF
-#             symbol_index = get_index_from_symbol(ib, contract.symbol)
-#             if len(symbol_index) > 0: symbol_index = symbol_index[0]
-#             symbol_index_ETF = get_index_etf(symbol_index)
-
-#             if symbol_index_ETF:
-
-#                 # Gathering Index historical data
-#                 timeframe_index = get_df_timeframe(df)
-#                 query_time = add_ibkr_timeframe_to_date(df['date'].iloc[-1], timeframe_index)
-#                 from_time = df['date'].iloc[0]
-#                 duration_index = get_ibkr_duration_from_time_diff(query_time, from_time)
-#                 df_index = get_symbol_hist_data(ib, symbol_index_ETF, timeframe_index, query_time, duration=duration_index, indicators_list=[])
-
-#                 # Assess Index trend
-#                 indicator_macd_index = ta.trend.MACD(close=df_index['close'], window_slow=50, window_fast=20, window_sign=9, fillna=False)
-#                 df_index['macd_diff'] = indicator_macd_index.macd_diff()
-#                 condition_index_trend_up = (df_index['macd_diff'] > df_index['macd_diff'].shift()) & (df_index['macd_diff'].shift() > df_index['macd_diff'].shift(2))
-#                 condition_index_trend_down = (df_index['macd_diff'] < df_index['macd_diff'].shift()) & (df_index['macd_diff'].shift() < df_index['macd_diff'].shift(2))
-#                 df_index['index_trend'] = numpy.where(condition_index_trend_up, 1, numpy.where(condition_index_trend_down, -1, 0))
-
-#                 # Adding Index trend values to main df dataframe
-#                 df = pd.merge(df, df_index[['date', 'index_trend']], on='date', how='left')
-
-#         if 'rsi' in indicators_list:
-#             indicator_rsi = ta.momentum.RSIIndicator(close=df['close'], window=14, fillna=False)
-#             df['rsi'] = indicator_rsi.rsi()
-
-#         if 'bollinger_bands' in indicators_list:
-#             indicator_bbands = ta.volatility.BollingerBands(close=df["close"], window=20, window_dev=2, fillna=False)
-#             df['bband_h'] = indicator_bbands.bollinger_hband()
-#             df['bband_l'] = indicator_bbands.bollinger_lband()
-#             df['bband_mavg'] = indicator_bbands.bollinger_mavg()
-#             # df["bband_h_ind"] = indicator_bbands.bollinger_hband_indicator()
-#             # df["bband_l_ind"] = indicator_bbands.bollinger_lband_indicator()
-
-#         if 'vol_ratio' in indicators_list:
-#             df['vol_ratio'] = df.volume / (df.volume - df.volume.diff())
-
-#         if 'atr_D' in indicators_list or 'change' in indicators_list:
-#             # Create daily df
-#             df_day = get_daily_df(df)
-#             df_day['date'] = df_day['date'].dt.date
-#             query_time = df_day['date'].iloc[0]
-#             whatToShow = 'TRADES' if contract.symbol not in get_forex_symbols_list() else 'MIDPOINT'
-#             bars_day_additional = ib.reqHistoricalData(contract, endDateTime=query_time, durationStr='1 M', barSizeSetting='1 day', whatToShow=whatToShow, useRTH=False)
-#             ib.sleep(CONSTANTS.PROCESS_TIME['long'])
-#             df_day_additional = util.df(bars_day_additional)
-#             df_day = pd.concat([df_day, df_day_additional], ignore_index=True).drop_duplicates(subset=['date'])
-#             df_day.sort_values(by=['date'], ascending=True, inplace=True)
-#             df_day.reset_index(inplace=True, drop=True)
-
-#         if "atr" in indicators_list:
-#             # Getting ATR values from daily candlesticks
-#             indicator_ATR = ta.volatility.AverageTrueRange(high=df_day["high"], low=df_day["low"], close=df_day["close"], window=14, fillna=False)
-#             df_day["atr"] = indicator_ATR.average_true_range()
-
-#             # Adding ATR values to main df dataframe
-#             df_day.rename(columns={'date': 'date_D'}, inplace=True)
-#             df = pd.merge(df, df_day[['date_D', 'atr_D']], on='date_D', how='left')
-
-#             df['atr_band_high'] = df['low_of_day'] + df['atr_D']
-#             df['atr_band_low'] = df['high_of_day'] - df['atr_D']
-
-#         if "change" in indicators_list:
-#             pdc = df_day.close[len(df_day)-2]
-#             df["change"] = (100 * df.close / pdc) - 100
-#             df["change_diff"] = df.change.diff()
-
-#         if "vpa" in indicators_list:
-#             # Calculate VPA deviations
-#             lookback_period_vpa = 20
-#             df['vpa_ratio_h'] = df['volume'] / abs(df['close'] - df['open'])
-#             df['vpa_ratio_l'] = abs(df['close'] - df['open']) / df['volume']
-#             df['vpa_z_score_h'] = (df['vpa_ratio_h'] - df['vpa_ratio_h'].rolling(window=lookback_period_vpa, min_periods=1).mean()) / df['vpa_ratio_h'].rolling(window=lookback_period_vpa, min_periods=1).std()
-#             df['vpa_z_score_l'] = (df['vpa_ratio_l'] - df['vpa_ratio_l'].rolling(window=lookback_period_vpa, min_periods=1).mean()) / df['vpa_ratio_l'].rolling(window=lookback_period_vpa, min_periods=1).std()
-
-#         if "r_vol" in indicators_list:
-#             lookback_period_r_vol = 3
-#             df['avg_vol'] = df['volume'].rolling(window=lookback_period_r_vol).mean()
-#             df['r_vol'] = df['volume'] / df['avg_vol']
-
-#             timeframe_df = df['date'].diff().dropna().mode()[0]
-#             df.set_index('date', inplace=True)
-
-#             if timeframe_df < timedelta(days=1):
-#                 df['avg_vol_at_time'] = df.groupby(df.index.time).apply(lambda d: d['volume'].rolling(lookback_period_r_vol, min_periods=1).mean()).reset_index(level=0, drop=True).sort_index()#.reset_index(drop=True)#.sort_values()#.reset_index(drop=True)
-#             else:
-#                 df['avg_vol_at_time'] = None
-
-#             df = df.reset_index()
-
-#             df['r_vol_at_time'] = df['volume'] / df['avg_vol_at_time']
-#             # print(df[df['date'].dt.time == datetime.time(19, 45)][['date', 'volume', 'avg_vol', 'r_vol', 'avg_vol_at_time', 'r_vol_at_time']].to_string())
-#             # input()
-
-#         if "levels" in indicators_list:
-
-#             # Prepare df for resampling
-#             df['date_D'] = df['date'].dt.date
-#             df['date_M'] = df['date'].dt.strftime('%Y-%m')
-
-#             th_times = CONSTANTS.TH_TIMES
-#             df['session'] = ['pre-market' if (t >= th_times['pre-market'] and t < th_times['rth']) else 'post-market' if (t >= th_times['post-market'] and t <= th_times['end_of_day']) else 'rth' for t in df['date'].dt.time]#strftime('%H-%M-%S')]
-#             # df['session2'] = pd.cut(df.date.dt.hour + df.date.dt.minute / 60.0, bins=[-float('inf'), 4, 9.5, 16, 20, float('inf')], labels=['Pre-market', 'RTH', 'Post-market', 'RTH', 'Post-market'], right=False)
-
-#             # Calculate pdc, pdh and pdl
-#             levels_list = [{'name':'pdh', 'col':'high', 'funct':'max', 'shift':1},
-#                            {'name':'pdl', 'col':'low', 'funct':'min', 'shift':1}]
-#             df = get_levels_by_resampling(df, levels_list, 'D')
-
-#             # Calculate pmh and pml
-#             df_pre_market = df[df['session'] == 'pre-market']
-#             levels_list = [{'name':'pmh', 'col':'high', 'funct':'max', 'shift':0},
-#                            {'name':'pml', 'col':'low', 'funct':'min', 'shift':0}]
-#             df = get_levels_by_resampling(df, levels_list, 'D', df2=df_pre_market)
-
-#             # Calculate shift to apply to pmh and pml
-#             time_interval = df['date'].iloc[1] - df['date'].iloc[0]
-#             time_interval2 = datetime(1, 1, 1, 9, 30) - datetime(1, 1, 1, 4, 0)
-#             shift_pm = int(round(time_interval2 / time_interval, 0))
-#             df_shift = df[df["date"].between(pd.to_datetime("2024-12-30 04:00:00-05:00"), pd.to_datetime("2024-12-30 09:30:00-05:00"))]
-
-#             df[['pmh', 'pml']] = df[['pmh', 'pml']].shift(shift_pm)
-
-#             # Calculate pdc, do, pdh_D, pdl_D
-#             df_rth = df[df['session'] == 'rth']
-#             levels_list = [{'name':'pdc', 'col':'close', 'funct':'last', 'shift':1},
-#                            {'name':'do', 'col':'open', 'funct':'first', 'shift':0},
-#                            {'name':'pdh_D', 'col':'high', 'funct':'max', 'shift':1},
-#                            {'name':'pdl_D', 'col':'low', 'funct':'min', 'shift':1}]
-#             df = get_levels_by_resampling(df, levels_list, 'D', df2=df_rth)
-
-#             # Calculate pMc, pMh, pMl
-#             levels_list = [{'name':'pMh', 'col':'high', 'funct':'max', 'shift':1},
-#                            {'name':'pMl', 'col':'low', 'funct':'min', 'shift':1},
-#                            {'name':'pMc', 'col':'close', 'funct':'last', 'shift':1},
-#                         #    {'name':'Mo', 'col':'open', 'funct':'first', 'shift':0},
-#                            {'name':'Mo', 'col':'open', 'funct':'first', 'shift':0}]
-#             df = get_levels_by_resampling(df, levels_list, 'M')
-
-#             # Calculate Camarilla Pivots
-#             piv_addon = ['', '_D', '_M']
-#             for p in piv_addon:
-#                 pc = 'pMc' if p == '_M' else 'pdc'
-#                 ph = 'pMh' if p == '_M' else 'pdh_D' if p == '_D' else 'pdh'
-#                 pl = 'pMl' if p == '_M' else 'pdl_D' if p == '_D' else 'pdl'
-#                 df['pp'+p] = (df[ph] + df[pl] + df[pc]) / 3
-#                 df['r1'+p] = df[pc] + 1.1 * (df[ph] - df[pl]) / 12
-#                 df['r2'+p] = df[pc] + 1.1 * (df[ph] - df[pl]) / 6
-#                 df['r3'+p] = df[pc] + 1.1 * (df[ph] - df[pl]) / 4
-#                 df['r4'+p] = df[pc] + 1.1 * (df[ph] - df[pl]) / 2
-#                 df['r5'+p] = df['r4'+p] + 1.168 * (df['r4'+p] - df['r3'+p])
-#                 df['r6'+p] = df[pc] * df[ph] / df[pl]
-#                 df['s1'+p] = df[pc] - 1.1 * (df[ph] - df[pl]) / 12
-#                 df['s2'+p] = df[pc] - 1.1 * (df[ph] - df[pl]) / 6
-#                 df['s3'+p] = df[pc] - 1.1 * (df[ph] - df[pl]) / 4
-#                 df['s4'+p] = df[pc] - 1.1 * (df[ph] - df[pl]) / 2
-#                 df['s5'+p] = df['s4'+p] - 1.168 * (df['s3'+p] - df['s4'+p])
-#                 df['s6'+p] = df[pc] - (df['r6'+p] - df[pc])
-
-#                 # Create Camarilla position column
-#                 conditions_cam_positions = [
-#                     (df['close'] < df['s6'+p]), (df['r6'+p] < df['close']), (df['s6'+p] < df['close']) & (df['close'] < df['s5'+p]), (df['s5'+p] < df['close']) & (df['close'] < df['s4'+p]),
-#                     (df['s4'+p] < df['close']) & (df['close'] < df['s3'+p]), (df['s3'+p] < df['close']) & (df['close'] < df['s2'+p]), (df['s2'+p] < df['close']) & (df['close'] < df['s1'+p]),
-#                     (df['s1'+p] < df['close']) & (df['close'] < df['r1'+p]), (df['r1'+p] < df['close']) & (df['close'] < df['r2'+p]), (df['r2'+p] < df['close']) & (df['close'] < df['r3'+p]),
-#                     (df['r3'+p] < df['close']) & (df['close'] < df['r4'+p]), (df['r4'+p] < df['close']) & (df['close'] < df['r5'+p]), (df['r5'+p] < df['close']) & (df['close'] < df['r6'+p])]
-
-#                 choices_cam_positions = [-6, 6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]
-
-#                 df['cam'+p+'_position'] = numpy.select(conditions_cam_positions, choices_cam_positions, default=numpy.nan)
-
-            # print(df[['date', 'date_D', 'date_M', 'pdc', 'pdh', 'pdl', 'pmh', 'pml', 'pdh_D', 'pdl_D', 'pMc', 'pMh', 'pMl']].to_string())
-            # print(df[['date', 'date_D', 'date_M', 'pMc', 'pMh', 'pMl', 'cam_position', 'cam_position_D', 'cam_position_M']].to_string())
-
-
-        # if "atr_old" in indicators_list:
-            # atr_list = [df_day.loc[df_day['date'] == datetime.strptime(pd.to_datetime(row['date']).strftime('%Y-%m-%d'), '%Y-%m-%d').date(), 'atr_D'].to_frame().iloc[-1]['atr_D'] for index, row in df.iterrows()]
-            # df_atr = pd.DataFrame(atr_list, columns=["atr"])
-            # df["atr"] = df_atr["atr"]
-
-            # print(df[["date", "close", "atr"]].to_string())
-            # print(df_day[["date", "close", "atr"]].to_string())
-
-            # ATR bands
-            # # Method 1
-            # atr_band_high_list, atr_band_low_list = [], []
-            # # date_prev = pd.to_datetime(df.loc[0, "date"]).strftime('%Y-%m-%d')
-            # # day_low, day_high = df.loc[0, "low"], df.loc[0, "high"]
-            # date_prev = pd.to_datetime(df['date'].iloc[0]).strftime('%Y-%m-%d')
-            # day_low, day_high = df['low'].iloc[0], df['high'].iloc[0]
-            # for i, d in enumerate(df["date"]):
-            #     date = pd.to_datetime(df['date'].iloc[i]).strftime('%Y-%m-%d')
-
-            #     if date != date_prev:
-            #         date_prev = date
-            #         # day_low = df.loc[i, "low"]
-            #         # day_high = df.loc[i, "high"]
-            #         day_low = df['low'].iloc[i]
-            #         day_high = df['high'].iloc[i]
-            #     else:
-            #         day_low = min(df['low'].iloc[i], day_low)
-            #         day_high = max(df['high'].iloc[i], day_high)
-
-            #     atr_band_high_list.append(day_low + df['atr_D'].iloc[i])
-            #     atr_band_low_list.append(day_high - df['atr_D'].iloc[i])
-
-            # df_atr_band_high = pd.DataFrame(atr_band_high_list, columns=["atr_band_high"])
-            # df_atr_band_low = pd.DataFrame(atr_band_low_list, columns=["atr_band_low"])
-            # df["atr_band_high"] = df_atr_band_high["atr_band_high"]
-            # df["atr_band_low"] = df_atr_band_low["atr_band_low"]
-
-        # if "levels_old" in indicators_list:
-        #     # iterate through df using and create list with previous days values
-        #     pdc_list, pdh_list, pdl_list, pmh_list, pml_list, pdp_list, pdp_list_D, pdp_list_M = [], [], [], [], [], [], [], []
-        #     date_prev = pd.to_datetime(df['date'].iloc[0]).strftime('%Y-%m-%d')
-        #     month_prev = pd.to_datetime(df['date'].iloc[0]).month
-        #     index_new_day, index_end_premarket, index_start_postmarket = 0, 0, 0
-        #     pdc, pdh, pdl, pmh, pml, pdh_D, pdl_D, pMc, pMh, pMl = None, None, None, None, None, None, None, None, None, None
-        #     pp, s1, s2, s3, s4, s5, s6, r1, r2, r3, r4, r5, r6 = None, None, None, None, None, None, None, None, None, None, None, None, None
-        #     pp_D, s1_D, s2_D, s3_D, s4_D, s5_D, s6_D, r1_D, r2_D, r3_D, r4_D, r5_D, r6_D = None, None, None, None, None, None, None, None, None, None, None, None, None
-        #     pp_M, s1_M, s2_M, s3_M, s4_M, s5_M, s6_M, r1_M, r2_M, r3_M, r4_M, r5_M, r6_M = None, None, None, None, None, None, None, None, None, None, None, None, None
-
-        #     # Get monthly data for monthly pivots calculation
-
-        #     date_init = pd.to_datetime(df['date'].iloc[0])#.strftime('%Y-%m-%d'))
-        #     query_time = pd.to_datetime(df["date"].iloc[len(df["date"])-1])#.strftime('%Y-%m-%d'))
-        #     num_months = (query_time.year - date_init.year) * 12 + (query_time.month - date_init.month) + 2
-        #     whatToShow = "TRADES" if contract.symbol not in get_forex_symbols_list() else "MIDPOINT"
-        #     if num_months >= 12: duration = str(numpy.floor(num_months / 12)) + ' Y'
-        #     else: duration = str(num_months) + ' M'
-        #     bars_M = ib.reqHistoricalData(contract, endDateTime=query_time, durationStr=duration, barSizeSetting='1 month', whatToShow=whatToShow, useRTH=False)
-        #     ib.sleep(CONSTANTS.PROCESS_TIME['long'])
-        #     df_M = util.df(bars_M)
-
-        #     # pdc_triggered = Trues
-        #     for i, d in enumerate(df["date"]):
-        #         date = pd.to_datetime(df['date'].iloc[i]).strftime('%Y-%m-%d')
-        #         time = pd.to_datetime(df['date'].iloc[i]).strftime('%H-%M-%S')
-        #         month = pd.to_datetime(date).month
-        #         if i > 0: time_prev = pd.to_datetime(df['date'].iloc[i-1]).strftime('%H-%M-%S')
-        #         else: time_prev = time
-
-        #         # Previous day high and low calculation
-        #         if date != date_prev:
-        #             # print(date)
-        #             date_prev = date
-        #             # pdh = max([df.loc[j, "high"] for j in range(index_end_premarket, index_start_postmarket)])
-        #             # pdl = min([df.loc[j, "low"] for j in range(index_end_premarket, index_start_postmarket)])
-        #             pdh = max([df['high'].iloc[j] for j in range(index_new_day, i)])
-        #             pdl = min([df['low'].iloc[j] for j in range(index_new_day, i)])
-        #             index_new_day = i
-
-        #             # Camarilla Pivots (Non-Daily Based Values)
-        #             if pdh and pdl and pdc:
-        #                 base_pivots = (pdh - pdl) * 1.1
-        #                 pp = (pdh + pdl + pdc) / 3
-        #                 r1, r2, r3, r4 = pdc + base_pivots / 12, pdc + base_pivots / 6, pdc + base_pivots / 4, pdc + base_pivots / 2
-        #                 r5, r6 = r4 + 1.168 * (r4 - r3), (pdh / pdl) * pdc
-        #                 s1, s2, s3, s4 = pdc - base_pivots / 12, pdc - base_pivots / 6, pdc - base_pivots / 4, pdc - base_pivots / 2
-        #                 s5, s6 = s4 - 1.168 * (s3 - s4), pdc - (r6 - pdc)
-
-        #         # Previous day close calculation
-        #         if time >= "16-00-00" and time_prev < "16-00-00":
-        #             pdc = df['close'].iloc[i-1]
-        #             index_start_postmarket = i
-
-        #         # Premarket high and low calculation
-        #         if time >= "09-30-00" and time_prev < "09-30-00":
-        #             pmh = max([df['high'].iloc[j] for j in range(index_new_day, i)])
-        #             pml = min([df['low'].iloc[j] for j in range(index_new_day, i)])
-        #             # pdh_D = max([df.loc[j, "high"] for j in range(index_end_premarket, i)])
-        #             # pdl_D = min([df.loc[j, "low"] for j in range(index_end_premarket, i)])
-        #             pdh_D = max([df['high'].iloc[j] for j in range(index_end_premarket, index_start_postmarket)], default=None)
-        #             pdl_D = min([df['low'].iloc[j] for j in range(index_end_premarket, index_start_postmarket)], default=None)
-        #             index_end_premarket = i
-
-        #             # Camarilla Pivots (Daily Based Values)
-        #             if pdh_D and pdl_D and pdc:
-        #                 base_pivots_D = (pdh_D - pdl_D) * 1.1
-        #                 pp_D = (pdh_D + pdl_D + pdc) / 3
-        #                 r1_D, r2_D, r3_D, r4_D = pdc + base_pivots_D / 12, pdc + base_pivots_D / 6, pdc + base_pivots_D / 4, pdc + base_pivots_D / 2
-        #                 r5_D, r6_D = r4_D + 1.168 * (r4_D - r3_D), (pdh_D / pdl_D) * pdc
-        #                 s1_D, s2_D, s3_D, s4_D = pdc - base_pivots_D / 12, pdc - base_pivots_D / 6, pdc - base_pivots_D / 4, pdc - base_pivots_D / 2
-        #                 s5_D, s6_D = s4_D - 1.168 * (s3_D - s4_D), pdc - (r6_D - pdc)
-
-        #         # Previous month high and low calculation
-        #         prev_month = lambda d: 12 if pd.to_datetime(d).month == 1 else pd.to_datetime(d).month - 1
-        #         pMc = df_M.loc[pd.to_datetime(df_M['date']).dt.month == prev_month(date), 'close'].iloc[0]
-        #         pMh = df_M.loc[pd.to_datetime(df_M['date']).dt.month == prev_month(date), 'high'].iloc[0]
-        #         pMl = df_M.loc[pd.to_datetime(df_M['date']).dt.month == prev_month(date), 'low'].iloc[0]
-
-        #         if pMh and pMl and pMc:
-        #             base_pivots_M = (pMh - pMl) * 1.1
-        #             pp_M = (pMh + pMl + pMc) / 3
-        #             r1_M, r2_M, r3_M, r4_M = pMc + base_pivots_M / 12, pMc + base_pivots_M / 6, pMc + base_pivots_M / 4, pMc + base_pivots_M / 2
-        #             r5_M, r6_M = r4_M + 1.168 * (r4_M - r3_M), (pMh / pMl) * pMc
-        #             s1_M, s2_M, s3_M, s4_M = pMc - base_pivots_M / 12, pMc - base_pivots_M / 6, pMc - base_pivots_M / 4, pMc - base_pivots_M / 2
-        #             s5_M, s6_M = s4_M - 1.168 * (s3_M - s4_M), pMc - (r6_M - pMc)
-
-        #             pdp_list_M.append([pp_M, s1_M, s2_M, s3_M, s4_M, s5_M, s6_M, r1_M, r2_M, r3_M, r4_M, r5_M, r6_M])
-        #         else:
-        #             pdp_list_M.append([None, None, None, None, None, None, None, None, None, None, None, None, None])
-
-
-        #         if index_start_postmarket == i:
-        #             pdc_list.append(None)
-        #         else:
-        #             pdc_list.append(pdc)
-
-        #         if index_new_day == i:
-        #             pdh_list.append(None)
-        #             pdl_list.append(None)
-        #             pdp_list.append([None, None, None, None, None, None, None, None, None, None, None, None, None])
-        #         else:
-        #             pdh_list.append(pdh)
-        #             pdl_list.append(pdl)
-        #             pdp_list.append([pp, s1, s2, s3, s4, s5, s6, r1, r2, r3, r4, r5, r6])
-
-        #         if index_end_premarket == i:
-        #             pmh_list.append(None)
-        #             pml_list.append(None)
-        #             pdp_list_D.append([None, None, None, None, None, None, None, None, None, None, None, None, None])
-        #         else:
-        #             pmh_list.append(pmh)
-        #             pml_list.append(pml)
-        #             pdp_list_D.append([pp_D, s1_D, s2_D, s3_D, s4_D, s5_D, s6_D, r1_D, r2_D, r3_D, r4_D, r5_D, r6_D])
-
-        #     levels_list = [pdc_list, pdh_list, pdl_list, pmh_list, pml_list] + [list(x) for x in zip(*pdp_list)] + [list(x) for x in zip(*pdp_list_D)] + [list(x) for x in zip(*pdp_list_M)]
-        #     levels_titles = ['pdc', 'pdh', 'pdl', 'pmh', 'pml', 'pp', 's1', 's2', 's3', 's4', 's5', 's6', 'r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'pp_D', 's1_D', 's2_D', 's3_D', 's4_D', 's5_D', 's6_D', 'r1_D', 'r2_D', 'r3_D', 'r4_D', 'r5_D', 'r6_D', 'pp_M', 's1_M', 's2_M', 's3_M', 's4_M', 's5_M', 's6_M', 'r1_M', 'r2_M', 'r3_M', 'r4_M', 'r5_M', 'r6_M']
-
-        #     for i, level in enumerate(levels_list):
-        #         df_level = pd.DataFrame(level, columns=[levels_titles[i]])
-        #         df[levels_titles[i]] = df_level[levels_titles[i]]
-
-
-            # print(df.to_string())
-            # print(df[["date", "close", "pdc", "pdh", "pdl", "pmh", "pml"]].to_string())
-            # input()
-
-
-        # df["diff"] = bars_df.close.diff()
-        # df["delta"] = bars_df.close - close_previous_day
-
-    # else: print("\nCould not add indicators, DataFrame is empty.\n")
-
-    # return df
-
-
-# def get_RSI(ib, symbol, timeframe, query_time=date_local_to_EST(datetime.now())):
-
-#     duration = "1W"
-#     if "min" in timeframe or "sec" in timeframe: duration = "1 W"
-#     elif "hour" in timeframe or "day" in timeframe: duration = "1 M"
-#     elif "month" in timeframe: duration = "1Y"
-
-#     df = get_symbol_hist_data(ib, symbol, timeframe, query_time, duration, indicators_list = ["rsi"])
-#     # RSI =
-
-#     # print(df.to_string())
-#     print(df[["date", "close", "rsi"]].to_string())
-#     print(df['rsi'].iloc[-1])
-#     input()
-
-#     # return RSI
-
-
-
-# def get_symbol_hist_data_recursive(ib, symbol, timeframe, time_brackets, step_duration="1 D", exisiting_df=pd.DataFrame(), indicators_list=None):
-
-#     contract, symbol = get_symbol_contract(ib, symbol)
-
-#     if step_duration == 'auto':
-#         step_duration = get_ibkr_fetch_duration_from_timeframe(timeframe)
-
-#     df = exisiting_df
-#     try:
-#         for time_bracket in time_brackets:
-#             to_time , from_time = time_bracket['to_time'], time_bracket['from_time']
-#             if to_time > from_time:
-#                 to_time_local = to_time
-#                 while to_time_local > from_time:
-#                     print("\nCreating DataFrame for ", symbol, " ", timeframe, " from ", to_time_local, ", duration ", step_duration)
-#                     df_local = get_symbol_hist_data(ib, symbol, timeframe, query_time=to_time_local, duration=step_duration, indicators_list=indicators_list)
-
-#                     if pd.to_datetime(df_local['date'].iloc[0]).tzinfo is None: df_local['date'] = pd.to_datetime(df_local['date']).dt.tz_localize(CONSTANTS.TZ_WORK)
-#                     df = pd.concat([df, df_local], ignore_index=True).drop_duplicates(subset=['date'])
-#                     to_time_local = df_local['date'].iloc[0]
-
-#             else: print("Could not create DataFrame, Start Time < End Time")
-
-#         if not df.empty:
-#             df.sort_values(by=['date'], ascending=True, inplace=True)
-#             df.reset_index(inplace = True, drop=True)
-#             # df = add_indicator(df, ib, contract, indicators_list)
-
-#     except Exception as e: print("Could not create DataFrame for symbol ", symbol, ". Error: ", e, "  |  Full error: ", traceback.format_exc())
-
-#     return df
-
-# def get_symbol_hist_data(ib, symbol, timeframe, query_time=date_local_to_EST(datetime.now()), duration="1 D", indicators_list=['all']):
-
-#     contract, symbol = get_symbol_contract(ib, symbol)
-#     if contract:
-
-#         end_query_time = substract_duration_from_time(query_time, duration)
-
-#         # Determine if all or portion of time period requested is already saved
-#         # Check if data are present locally first, including all required indicators
-#         hist_folder_symbol = os.path.join(PATHS.folders_path['hist_market_data'], str(symbol))
-#         if not os.path.exists(hist_folder_symbol): os.mkdir(hist_folder_symbol)
-#         df_existing, to_time_exist, from_time_exist, file_path = check_existing_mkt_data_file(symbol, timeframe, hist_folder_symbol, delete_file=False)
-
-#         time_brackets = []
-#         if to_time_exist and from_time_exist:
-
-#             if query_time < to_time_exist:
-#                 to_time = query_time
-#             else:
-#                 to_time = to_time_exist
-#                 time_brackets.append({'query_time': query_time, 'duration': duration})#get_ibkr_duration_from_time_diff(query_time, to_time_exist)})
-
-#             if end_query_time > from_time_exist:
-#                 from_time = end_query_time
-#             else:
-#                 from_time = from_time_exist
-#                 time_brackets.append({'query_time': from_time_exist, 'duration': duration})#get_ibkr_duration_from_time_diff(from_time_exist, end_query_time)})
-
-#             df = df_existing[(df_existing['date'] <= to_time) & (df_existing['date'] >= from_time)]
-
-#         else:
-#             df = pd.DataFrame()
-#             time_brackets.append({'query_time': query_time, 'duration': duration})
-
-#         # Get remaining of historical data from IBKR
-#         for time_bracket in time_brackets:
-#             query_time = time_bracket['query_time']
-#             duration = time_bracket['duration']
-
-#             whatToShow = "TRADES"
-#             if symbol in get_forex_symbols_list():
-#                 whatToShow = "MIDPOINT"
-#                 if "levels" in indicators_list:
-#                     indicators_list.remove("levels")
-
-#             bars = ib.reqHistoricalData(
-#                 # contract, endDateTime=query_time, durationStr='3600 S',
-#                 # barSizeSetting='10 secs', whatToShow='TRADES', useRTH=False) # Available Settings: https://interactivebrokers.github.io/tws-api/historical_bars.html
-#                 contract, endDateTime=query_time, durationStr=duration,
-#                 barSizeSetting=timeframe, whatToShow=whatToShow, useRTH=False) # Available Settings: https://interactivebrokers.github.io/tws-api/historical_bars.html
-#             ib.sleep(CONSTANTS.PROCESS_TIME['long'])
-
-#             # Convert to pandas dataframe (pandas needs to be installed):
-#             bars_df = util.df(bars)
-
-#             if pd.to_datetime(bars_df['date'].iloc[0]).tzinfo is None: bars_df['date'] = pd.to_datetime(bars_df['date']).dt.tz_localize(CONSTANTS.TZ_WORK)
-#             df = pd.concat([df, bars_df], ignore_index=True).drop_duplicates(subset=['date'])
-#             if not df.empty:
-#                 df.sort_values(by=['date'], ascending=True, inplace=True)
-#                 df.reset_index(inplace = True, drop=True)
-
-#         if indicators_list:
-#             df = indicators.add_indicator(df, ib, contract, indicators_list)
-
-#     return df
-
-# def get_symbol_hist_data_recursive(ib, symbol, timeframe, to_time=None, from_time=None, step_duration="1 D", indicators_list=['all'], hist_folder=None, file_format=None) -> pd.DataFrame:
-
-#     if indicators_list is None:
-#         indicators_list = ['all']
-
-#     if step_duration == 'auto':
-#         step_duration = get_ibkr_fetch_duration_from_timeframe(timeframe)
-
-#     # contract, symbol = get_symbol_contract(ib, symbol)
-#     # if not contract:
-#     #     return pd.DataFrame()
-
-#     hist_folder = hist_folder if hist_folder else PATHS.folders_path['hist_market_data']
-#     hist_folder_symbol = os.path.join(hist_folder, str(symbol))
-#     os.makedirs(hist_folder_symbol, exist_ok=True)
-
-#     # df_existing, existing_start, existing_end, existing_file_path = check_existing_mkt_data_file(
-#     #     symbol, timeframe, hist_folder_symbol, delete_file=False)
-
-#     # # Complete mode overrides time range
-#     # if complete:
-#     #     if existing_end is None:
-#     #         print(f"[{symbol}] No existing data found for 'complete' mode.")
-#     #         return pd.DataFrame()
-#     #     to_time = date_local_to_EST(datetime.now())
-#     #     from_time = existing_end
-
-#     if not to_time or not from_time:
-#         raise ValueError("Either provide both to_time and from_time")
-
-#     # # Skip existing data
-#     # if existing_start and existing_end:
-#     #     if to_time >= existing_end:
-#     #         print(f"[{symbol}] All data already fetched up to {existing_end}. Nothing new to fetch.")
-#     #         return df_existing
-#     #     # Skip existing data range by adjusting to_time to just after last existing record
-#     #     to_time = min(to_time, existing_end + timedelta(seconds=1))
-
-#     step_duration_td = get_ibkr_duration_as_timedelta(step_duration)
-#     all_data = pd.DataFrame()
-#     # latest_loaded_time = None
-#     current_start = to_time
-
-#     try:
-#         # # # Split time range into gaps: before existing data, and after
-#         # # missing_ranges = []
-
-#         # # if existing_start and existing_end:
-#         # #     if to_time < existing_start:
-#         # #         missing_ranges.append((to_time, existing_start - timedelta(seconds=1)))
-#         # #     if from_time > existing_end:
-#         # #         missing_ranges.append((existing_end + timedelta(seconds=1), from_time))
-#         # # else:
-#         # #     missing_ranges.append((to_time, from_time))
-
-#         # # Loop through missing ranges and fetch in chunks
-#         # for range_start, range_end in missing_ranges:
-#             # for chunk_start, chunk_end in generate_time_chunks(range_end, range_start, step_duration_td):
-#         # for chunk_start, chunk_end in generate_time_chunks(to_time, from_time, step_duration_td):
-#         while current_start > from_time:
-#             chunk_start = current_start
-#             chunk_end = chunk_start - step_duration_td
-#             if chunk_end < from_time:
-#                 chunk_end = from_time
-
-#             print(f"⏳ Fetching data for {symbol}, {timeframe}, {step_duration} | {chunk_end} → {chunk_start}")
-#             df_chunk = get_symbol_hist_data(ib, symbol, timeframe, query_time=chunk_start,
-#                                             duration=step_duration, indicators_list=indicators_list, file_format=file_format)
-
-#             if df_chunk.empty:
-#                 print(f"⚠️ No data for chunk: {chunk_start} → {chunk_end}")
-#                 current_start = chunk_end - timedelta(seconds=1)
-#                 continue
-
-#             df_chunk = format_df_date(df_chunk)
-#             all_data = pd.concat([all_data, df_chunk], ignore_index=True).drop_duplicates(subset=['date'])
-#             all_data.sort_values('date', inplace=True)
-
-#             # # Update to_time to be the latest date minus a second (to go backward)
-#             # latest_loaded_time = df_chunk['date'].min()
-#             # if latest_loaded_time and latest_loaded_time <= from_time:
-#             #     # We reached or passed the end of requested data
-#             #     break
-#             # to_time = latest_loaded_time - timedelta(seconds=1)
-
-#             # Move the window backward based on the oldest date in this chunk
-#             current_start = df_chunk['date'].min() - timedelta(seconds=1)
-
-#         all_data.reset_index(drop=True, inplace=True)
-
-#         # # Merge with existing data
-#         # if not df_existing.empty:
-#         #     all_data = pd.concat([df_existing, all_data], ignore_index=True).drop_duplicates(subset=['date'])
-#         #     all_data.sort_values('date', inplace=True)
-#         #     all_data.reset_index(drop=True, inplace=True)
-
-#         return all_data
-
-#     except Exception as e:
-#         print(f"❌ Error fetching {symbol} from {to_time} to {from_time}: {e}")
-#         print(traceback.format_exc())
-#         return all_data
-
-
 
 if __name__ == "__main__":
-
-    # current_path = os.path.realpath(__file__)
-    # path = path_current_setup(current_path)
 
     input("\nEnter anything to exit")

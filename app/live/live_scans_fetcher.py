@@ -15,7 +15,7 @@ class LiveScansFetcher(live_loop_base.LiveLoopBase):
         return constants.CONSTANTS.TH_TIMES[start_label] < now < constants.CONSTANTS.TH_TIMES[end_label]
 
     def _scan_gappers(self):
-        if not self._is_between_market_times('pre-market', 'rth'):
+        if not helpers.is_between_market_times('pre-market', 'rth', self.config.timezone):
             return
         print('\n======== FETCHING GAPPERS UP ========\n')
         symbols_up, df_up = scanner.scannerTradingView("GapperUp")
@@ -28,18 +28,15 @@ class LiveScansFetcher(live_loop_base.LiveLoopBase):
         helpers.save_to_daily_csv(self.ib, symbols_down, constants.PATHS.daily_csv_files['gapper_down'])
 
     def _scan_earnings(self):
-        if not self._is_between_market_times('pre-market', 'rth'):
+        if not helpers.is_between_market_times('pre-market', 'rth', self.config.timezone):
             return
         print('\n======== FETCHING RECENT EARNINGS ========\n')
-        symbols = scanner.scannerFinviz("RE")
+        symbols, _ = scanner.scannerFinviz("RE")
         print(symbols)
         helpers.save_to_daily_csv(self.ib, symbols, constants.PATHS.daily_csv_files['earnings'])
 
     def _scan_bb_rsi_reversal(self):
-        if not self._is_between_market_times('pre-market', 'end_of_day'):
-            return
-        print('\n======== FETCHING RSI REVERSALS ========\n')
-        symbols, df = scanner.scannerTradingView("RSI-Reversal")
+        symbols = self.manager.scan_bb_rsi_reversal()
         print(symbols)
         helpers.save_to_daily_csv(self.ib, symbols, constants.PATHS.daily_csv_files['bb_rsi_reversal'])
     
@@ -53,10 +50,11 @@ if __name__ == "__main__":
 
     args = sys.argv
     paper_trading = not 'live' in args
+    local_ib = 'local' in args
     continuous = not 'snapshot' in args
     wait_seconds = next((int(float(arg[5:])) for arg in args if arg.startswith('wait=')), 3*60)
 
-    fetcher = LiveScansFetcher(paper_trading=paper_trading, wait_seconds=wait_seconds, continuous=continuous)
+    fetcher = LiveScansFetcher(wait_seconds=wait_seconds, continuous=continuous, paper_trading=paper_trading, remote_ib=not local_ib)
     fetcher.run()
 
 

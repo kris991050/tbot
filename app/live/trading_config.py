@@ -35,6 +35,7 @@ class TradingConfig:
         self.revised = False
         self.stop = 'hod'
         self.paper_trading = True
+        self.remote_ib = True
 
         # Data handling config
         # self.look_backward = '1M'

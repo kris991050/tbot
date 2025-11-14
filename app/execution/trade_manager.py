@@ -12,6 +12,7 @@ from data import hist_market_data_handler
 from strategies import bb_rsi_reversal_strategy, sr_bounce_strategy
 from live import trading_config
 from ml import ml_trainer
+from miscellaneous import scanner
 
 
 def get_strategy_instance(strategy_name:str, revised:bool=False, rsi_threshold:int=75, cam_M_threshold:int=4, time_target_factor:int=10):
@@ -56,29 +57,6 @@ class TradeManager:
 
     def _get_strategy_instance(self):
         return get_strategy_instance(self.strategy_name, self.config.revised)
-        # if 'bb_rsi_reversal_bull' in self.strategy:
-        #     return bb_rsi_reversal_strategy.BBRSIReversalStrategy(direction='bull', rsi_threshold=75, cam_M_threshold=4, revised=self.config.revised)
-        # elif 'bb_rsi_reversal_bear' in self.strategy:
-        #     return bb_rsi_reversal_strategy.BBRSIReversalStrategy(direction='bear', rsi_threshold=75, cam_M_threshold=4, revised=self.config.revised)
-        # else:
-        #     raise ValueError(f"Strategy '{self.strategy}' not recognized")
-        
-    # def _set_targets(self, target, stop):
-        
-    #     if stop == 'levels':
-    #         self.stop = stop
-    #         self.stop_level_types = None#['sr_1h', 'sr_1D', 'sr_1W', 'pivots', 'pivots_D', 'pivots_M', 'levels', 'levels_M']
-    #     else:
-    #         self.stop = stop or 'predicted_drawdown'
-    
-    # def _resolve_target_handler(self):
-    #     # Target handler
-    #     if 'vwap' in self.target:
-    #         target_hdlr = target_handler.VWAPCrossTargetHandler(self.timeframe, max_time='eod')
-    #     else:
-    #         target_hdlr = None
-            
-    #     return target_hdlr
 
     def _resolve_stop_handler(self):
         # Stop-loss handler
@@ -129,94 +107,21 @@ class TradeManager:
         if 'market_cap_cat' in required_columns:
             required_columns.remove('market_cap_cat')
         return required_columns
-    
-    # def _get_timeframes_for_feature(self, feature_name, required_columns):
-    #     """
-    #     Helper function to extract the timeframes for the given feature from the required columns.
-    #     """
-    #     mtf_timeframes = []
-    #     for feature in CONSTANTS.MTF_SETTINGS:
-    #         if feature_name == feature['name']:
-    #             # Find timeframes corresponding to this feature
-    #             for timeframe in feature['timeframes']:
-    #                 if any(f"{feature_name}_{timeframe}" in col for col in required_columns):
-    #                     mtf_timeframes.append(timeframe)
-    #     return mtf_timeframes
 
     def _resolve_features(self):
-        # required_columns = self.get_required_columns()
-        # feature_types = {'indicator_types': [], 'pattern_types': [], 'candle_pattern_list': [], 'level_types': [], 'sr_types': []}
-
-        # if any(ind in col for ind in ['ema', 'sma', 'adx', 'macd'] for col in required_columns):
-        #     feature_types['indicator_types'].append('trend')
-        # if any(ind in col for ind in ['vwap', 'r_vol', 'avg_vol', 'pm_vol'] for col in required_columns):
-        #     feature_types['indicator_types'].append('volume')
-        # if any(ind in col for ind in ['bband', 'atr', 'day_range', 'volatility_ratio', 'volatility_change'] for col in required_columns):
-        #     feature_types['indicator_types'].append('volatility')
-        # if any(ind in col for ind in ['rsi', 'awesome'] for col in required_columns):
-        #     feature_types['indicator_types'].append('momentum')
-        # if any(ind in col for ind in ['gap', 'change'] for col in required_columns):
-        #     feature_types['indicator_types'].append('price')
-
-        # if any(ind in col for ind in ['levels'] for col in required_columns):
-        #     feature_types['level_types'].append('daily')
-        # if any(ind in col for ind in ['levels_M'] for col in required_columns):
-        #     feature_types['level_types'].append('monthly')
-        # if any(ind in col for ind in ['pivots'] for col in required_columns):
-        #     feature_types['level_types'].append('camarilla')
-
-        # if any(ind in col for ind in ['hammer', 'engulfing', 'marubozu', 'doji', 'volume_spike', 'bullish_score', 'bearish_score', 'score_bias', 'return', 'directional_bias', 'bias_trend', 'hybrid_bias', 'hybrid_direction'] for col in required_columns):
-        #     feature_types['pattern_types'].append('candle')
-        # if any(ind in col for ind in ['divergence'] for col in required_columns):
-        #     feature_types['pattern_types'].append('divergence')
-        # if any(ind in col for ind in ['low_volume', 'bband_width_pct', 'atr_in_range', 'inside_bar', 'dbscan_cluster', 'consolidation'] for col in required_columns):
-        #     feature_types['pattern_types'].append('range')
-        # if any(ind in col for ind in ['breakout', 'price_buffer_pct'] for col in required_columns):
-        #     feature_types['pattern_types'].append('breakout', 'range')
-        # if any(ind in col for ind in ['trend'] for col in required_columns):
-        #     feature_types['pattern_types'].append('trend')
-        # if any(ind in col for ind in ['index_trend'] for col in required_columns):
-        #     feature_types['pattern_types'].append('index_trend')
-        
-        # feature_types['candle_pattern_list'] = ['all']
-
-        # # sr_cols = any(ind in col for ind in ['sr_'] for col in required_columns)
-        # sr_cols = [col for col in required_columns if 'sr_' in col]
-        # for sr_col in sr_cols:
-        #     # Extract the timeframe (1min, 1h, 1D, etc.) from the column name (e.g., sr_1min_dist_to_next)
-        #     match = re.search(r'sr_(\d+(?:min|h|D|W))', sr_col)
-        #     if match:
-        #         timeframe = match.group(1)
-        #         # Find the corresponding SR setting
-        #         sr_setting = next((sr for sr in CONSTANTS.SR_SETTINGS if sr['timeframe'] == timeframe), None)
-        #         if sr_setting:
-        #             feature_types['sr_types'].append(sr_setting)
-
         required_columns = self.get_required_columns()
         feature_types = {'indicator_types': [], 'pattern_types': [], 'candle_pattern_list': ['all'], 'level_types': [], 'sr_types': []}
         mtf = []
 
-        # Loop through indicator types and classify them
-        # for indicator in CONSTANTS.INDICATOR_TYPES:
-        #     if any(indicator['name'] in col for col in required_columns):
-        #         feature_types['indicator_types'].append(indicator['category'])
         for indicator_category in CONSTANTS.INDICATOR_TYPES:
             # Check if any of the indicator names in this category are in required_columns
             if any(indicator in col for col in required_columns for indicator in indicator_category['names']):
                 feature_types['indicator_types'].append(indicator_category['category'])
 
-        # Loop through pattern types and classify them
-        # for pattern in CONSTANTS.PATTERN_TYPES:
-        #     if any(pattern['name'] in col for col in required_columns):
-        #         feature_types['pattern_types'].append(pattern['category'])
         for pattern_category in CONSTANTS.PATTERN_TYPES:
             if any(pattern in col for col in required_columns for pattern in pattern_category['names']):
                 feature_types['pattern_types'].append(pattern_category['category'])
 
-        # Loop through level types and classify them
-        # for level in CONSTANTS.LEVEL_TYPES:
-        #     if any(level['name'] in col for col in required_columns):
-        #         feature_types['level_types'].append(level['category'])
         for level_category in CONSTANTS.LEVEL_TYPES:
             if any(level in col for col in required_columns for level in level_category['names']):
                 feature_types['level_types'].append(level_category['category'])
@@ -228,16 +133,9 @@ class TradeManager:
             if match:
                 timeframe = match.group(1)
                 feature_types['sr_types'].append(timeframe)
-                # sr_setting = next((sr for sr in CONSTANTS.SR_SETTINGS if sr['timeframe'] == timeframe), None)
-                # if sr_setting:
-                #     feature_types['sr_types'].append(sr_setting)
 
         # Check for corresponding timeframes for multi-timeframe
         non_sr_cols = [col for col in required_columns if col not in sr_cols]
-        # for col in non_sr_cols:
-        #     for tf in CONSTANTS.TIMEFRAMES_STD:
-        #         if f'_{tf}' in col:
-        #             mtf.append(tf)
         for col in non_sr_cols:
             mtf.extend(tf for tf in set(CONSTANTS.TIMEFRAMES_STD) if f'_{tf}' in col)
 
@@ -245,9 +143,6 @@ class TradeManager:
         mtf = list(set(mtf))
         for key in ['indicator_types', 'level_types', 'pattern_types', 'sr_types']:
             feature_types[key] = list(set(feature_types[key]))
-
-        # feature_types = ['all']
-        # mtf = None
 
         return feature_types, mtf    
 
@@ -300,20 +195,6 @@ class TradeManager:
         if self.config.rrr_threshold and rrr < self.config.rrr_threshold:
             return False, rrr  # Skip trade
         return True, rrr
-        
-        
-        # predicted_dd = curr_row.get('predicted_drawdown')
-
-        # # # condition_vwap = (self.target == 'vwap_cross' and 'vwap' in curr_row)
-        # # condition_vwap = isinstance(self.target_handler, target_handler.VWAPCrossTargetHandler)
-        # # expected_reward = abs(curr_row[f'vwap_{self.timeframe}'] - curr_row['close']) if condition_vwap else None
-        # # predicted_dd = curr_row.get('predicted_drawdown') if condition_vwap else None
-        # # # expected_reward = self.estimate_expected_reward(curr_row)
-
-        # if self.config.rrr_threshold and predicted_dd and expected_reward:
-        #     rrr = expected_reward / predicted_dd if predicted_dd > 0 else float('inf')
-        #     if rrr < self.config.rrr_threshold:
-        #         return False  # Skip trade
 
     def evaluate_quantity(self, prediction):
         if isinstance(self.config.size, int):
@@ -380,18 +261,28 @@ class TradeManager:
         return df_csv_file
         # return [symbol for symbol in df_csv_file['Symbol']]
     
-    def get_scanner_data(self, now, last_scanner_check=None):
-        df_csv_file = self.get_symbols_from_daily_data_folder(date=now)
+    def scan_bb_rsi_reversal(self):
+        if not helpers.is_between_market_times('pre-market', 'end_of_tday', self.config.timezone):
+            return []
+        print('\n======== FETCHING RSI REVERSALS ========\n')
+        symbols, _ = scanner.scannerTradingView("RSI-Reversal")#scanner.scannerFinviz("RE")
+        return symbols
 
-        symbols_scanner = []
-        if not df_csv_file.empty:
-            df_csv_file['Time'] = pd.to_datetime(df_csv_file['Time']).dt.tz_localize(self.tz)
-            if last_scanner_check:
-                symbols_scanner = df_csv_file.loc[(df_csv_file['Time'] >= last_scanner_check) & (df_csv_file['Time'] <= now), 'Symbol'].tolist()
-            else:
-                symbols_scanner = df_csv_file.loc[df_csv_file['Time'] <= now,'Symbol'].tolist()
-        
-        # symbols_scanner = symbols_scanner[0:4]
+    def get_scanner_data(self, now:datetime, use_daily_data:bool=False, last_scanner_check:pd.Timestamp=None):
+
+        symbols_scanner = []        
+        if not use_daily_data:
+            if 'bb_rsi_reversal' in self.strategy_instance.name:
+                symbols_scanner = self.scan_bb_rsi_reversal()
+        else:
+            df_csv_file = self.get_symbols_from_daily_data_folder(date=now)
+
+            if not df_csv_file.empty:
+                df_csv_file['Time'] = pd.to_datetime(df_csv_file['Time']).dt.tz_localize(self.tz)
+                if last_scanner_check:
+                    symbols_scanner = df_csv_file.loc[(df_csv_file['Time'] >= last_scanner_check) & (df_csv_file['Time'] <= now), 'Symbol'].tolist()
+                else:
+                    symbols_scanner = df_csv_file.loc[df_csv_file['Time'] <= now,'Symbol'].tolist()
 
         return symbols_scanner
 
@@ -412,18 +303,11 @@ class TradeManager:
         return df
 
     def enrich_df(self, symbol, file_format:str='parquet', block_add_sr:bool=False, base_timeframe:Timeframe=None, from_time:datetime=None, to_time:datetime=None):
-        # bb_rsi_tf_list = bb_rsi_tf_list or ['5min', '15min', '60min', '1D'] if 'bb_rsi_reversal' in self.strategy_instance.name else []
         feature_types, mtf = self._resolve_features()
         enricher = hist_market_data_handler.HistMarketDataEnricher(self.ib, timeframe=self.strategy_instance.timeframe, base_timeframe=base_timeframe, 
                                                                    feature_types=feature_types, mtf=mtf, file_format=file_format, base_folder=self.base_folder, 
                                                                    validate=False, block_add_sr=block_add_sr, timezone=self.tz)
         results = enricher.run(symbol=symbol, from_time=from_time, to_time=to_time)
-        # if results:
-        #     valid_df = next((r['df'] for r in results if r.get('df') is not None and not r['df'].empty), pd.DataFrame())
-        #     df = valid_df
-        #     df = df[pd.to_datetime(df["date"]).between(from_time, to_time)] if not df.empty else pd.DataFrame()
-        # else:
-        #     df = pd.DataFrame()
         valid_results = enricher.get_valid_result(results)
 
         return valid_results['df'] if valid_results else pd.DataFrame()
@@ -435,11 +319,9 @@ class TradeManager:
         from_time = helpers.substract_duration_from_time(trig_time, self.config.look_backward)
         
         # Fetch symbol
-        # df = self.fetch_df(symbol, to_time, from_time, file_format=file_format)
         df = self.fetch_df(symbol, from_time, to_time, file_format=file_format)
 
         # Enrich data
-        # df = self.enrich_df(symbol, to_time, from_time, file_format=file_format, block_add_sr=block_add_sr)
         df = self.enrich_df(symbol, from_time, to_time, file_format=file_format, block_add_sr=block_add_sr)
 
         if not df.empty:
@@ -463,181 +345,3 @@ class IBKRCanadaCommission(bt.CommInfoBase):
         commission = max(commission, 1.00)         # Min CAD $1.00
         commission = min(commission, trade_value * 0.005)  # Max 0.5%
         return commission
-
-
-
-# class TradingManager:
-
-#     @staticmethod
-#     def get_required_columns(strategy, target_handler, stop_handler):
-#         return list({
-#                 *getattr(strategy, 'trigger_columns', []),
-#                 *getattr(strategy, 'required_columns', []),
-#                 *getattr(target_handler, 'required_columns', []),
-#                 *getattr(stop_handler, 'required_columns', [])
-#             })
-
-#     @staticmethod
-#     def resolve_direction(strategy):
-#         if hasattr(strategy, 'direction'):
-#             if strategy.direction == 'bull':
-#                 return 1
-#             elif strategy.direction == 'bear':
-#                 return -1
-#         return None
-
-#     @staticmethod
-#     def resolve_stop_price(curr_row, active_stop_price, stop_handler, direction):
-#         """
-#         Resolve stop-loss price at trade entry and store it.
-#         """
-#         if active_stop_price is None and stop_handler is not None:
-#             if hasattr(stop_handler, 'resolve_stop_price'):
-#                 active_stop_price, le = stop_handler.resolve_stop_price(curr_row, direction)
-
-#         return active_stop_price
-
-#     @staticmethod
-#     def assess_reason2close(curr_row, prev_row, target_handler, stop_handler, active_stop_price, direction):
-#         """
-#         Determines if the current trade should be closed due to:
-#         - Cached stop-loss value
-#         - Target exit condition
-#         """
-#         stop_reason = None
-
-#         if active_stop_price is not None and stop_handler is not None:
-#             stop_reason = stop_handler.check_stop_loss(curr_row, active_stop_price, direction)
-
-#         target_reason = target_handler.get_target_event(prev_row, curr_row)
-
-#         return stop_reason or target_reason
-
-#     @staticmethod
-#     def evaluate_prediction(prediction, pred_th, threshold=None):
-#         if not prediction:
-#             return None
-#         threshold = threshold or pred_th
-#         return prediction >= threshold if threshold else True
-
-#     @staticmethod
-#     def evaluate_RRR(curr_row, target_hdlr, rrr_threshold):
-#         # Assess Risk to Reward Ratio
-#         # condition_vwap = (self.target == 'vwap_cross' and 'vwap' in curr_row)
-#         condition_vwap = isinstance(target_hdlr, target_handler.VWAPCrossTargetHandler)
-#         expected_reward = abs(curr_row['vwap'] - curr_row['close']) if condition_vwap else None
-#         predicted_dd = curr_row.get('predicted_drawdown') if condition_vwap else None
-#         # expected_reward = self.estimate_expected_reward(curr_row)
-
-#         if rrr_threshold and predicted_dd and expected_reward:
-#             rrr = expected_reward / predicted_dd if predicted_dd > 0 else float('inf')
-#             if rrr < rrr_threshold:
-#                 return False  # Skip trade
-#         return True
-
-#     @staticmethod
-#     def evaluate_quantity(prediction, size, pred_th, tier_max):
-#         if isinstance(size, int):
-#             return size
-
-#         elif size == 'auto':
-#             if pred_th and prediction >= pred_th:
-#                 tier_range = (1.0 - pred_th) / tier_max
-#                 quantity = int((prediction - pred_th) / tier_range) + 1
-
-#                 return min(quantity, tier_max)
-#             else:
-#                 return 1
-
-#     # @staticmethod
-#     # def evaluate_quantity(prediction, size, pred_th, tier_max):
-#     #     if isinstance(size, int):
-#     #         return size
-
-#     #     elif size == 'auto':
-#     #         if pred_th and prediction <= pred_th:
-#     #             tier_range = int((1.0 - pred_th) / tier_max)
-#     #             quantity = int((prediction - pred_th) / tier_range) + 1
-
-#     #             # Cap quantity to tier_max
-#     #             return min(quantity, tier_max)
-#     #         else: return 1
-
-#     @staticmethod
-#     def apply_model_predictions(df, trainer, trainer_dd=None, return_proba=True, shift_features=False):
-#         if 'market_cap_cat' not in df.columns:
-#             df['market_cap_cat'] = helpers.categorize_market_cap(df.attrs['market_cap'])
-
-#         # Predict using model and add predictions to dataframe
-#         print("🤖 Generating trade entry predictions...")
-#         predictions = trainer.predict(df.copy(), return_proba=return_proba, shift_features=shift_features)
-#         df['model_prediction'] = predictions
-
-#         if trainer_dd is not None:
-#             print("🤖 Generating drawdown predictions...")
-#             predictions_dd_pct = trainer_dd.predict(df.copy(), return_proba=False, shift_features=shift_features)
-#             df['predicted_drawdown'] = predictions_dd_pct * df['close']
-
-#         return df
-
-#     @staticmethod
-#     def evaluate_entry_conditions(row, strategy, target_handler, pred_th, rrr_threshold):
-#         is_triggered = strategy.evaluate_trigger(row)
-#         is_predicted = TradingManager.evaluate_prediction(row.get('model_prediction'), pred_th)
-#         is_RRR = TradingManager.evaluate_RRR(row, target_handler, rrr_threshold)
-#         return is_triggered and is_predicted and is_RRR
-    
-#     @staticmethod
-#     def get_symbols_from_daily_data_folder(strategy_name, date=datetime.datetime.now()):
-#         daily_data_folder = helpers.get_path_daily_data_folder(date, create_if_none=False)
-#         if 'bb_rsi_reversal' in strategy_name:
-#             file_path = os.path.join(daily_data_folder, PATHS.daily_csv_files['bb_rsi_reversal'])
-#         else:
-#             file_path = None
-#         if not os.path.exists(file_path):
-#             print(f"❌ Path does not exist: {file_path}")
-#             return pd.DataFrame()
-        
-#         df_csv_file = helpers.load_df_from_file(file_path)
-
-#         return df_csv_file
-#         # return [symbol for symbol in df_csv_file['Symbol']]
-
-#     @staticmethod
-#     def get_strategy_instance(strategy_name: str, revised: bool):
-#         if 'bb_rsi_reversal_bull' in strategy_name:
-#             return bb_rsi_reversal_strategy.BBRSIReversalStrategy(direction='bull', rsi_threshold=75, cam_M_threshold=4, revised=revised)
-#         elif 'bb_rsi_reversal_bear' in strategy_name:
-#             return bb_rsi_reversal_strategy.BBRSIReversalStrategy(direction='bear', rsi_threshold=75, cam_M_threshold=4, revised=revised)
-#         else:
-#             raise ValueError(f"Strategy '{strategy_name}' not recognized")
-
-#     @staticmethod
-#     def load_data_forward(ib, symbol, timeframe, trig_time, to_time, strategy_name, look_backward='2 M', file_format='parquet'):
-
-#         # Fetch symbol
-#         fetcher = hist_market_data_handler.HistMarketDataFetcher(ib, timeframe, file_format, delete_existing=True)
-#         from_time = helpers.substract_duration_from_time(trig_time, look_backward)
-#         params = {'symbol': symbol, 'to_time': to_time, 'from_time': from_time, 'step_duration': '1 W'}
-#         df = helpers.load_df_from_file(fetcher.run(params))
-
-#         # Enrich data
-#         df = TradingManager.enrich_df(ib, symbol, timeframe, to_time, from_time, strategy_name, file_format=file_format)
-#         df = df[(df['date'] >= trig_time) & (df['date'] <= to_time)] if not df.empty else pd.DataFrame()
-
-#         return df
-    
-#     @staticmethod
-#     def enrich_df(ib, symbol, timeframe, to_time, from_time, strategy_name, bb_rsi_tf_list=None, file_format='parquet'):
-#         bb_rsi_tf_list = bb_rsi_tf_list or ['5min', '15min', '60min', '1D'] if 'bb_rsi_reversal' in strategy_name else []
-#         enricher = hist_market_data_handler.HistMarketDataEnricher(ib, timeframe, file_format=file_format,
-#                                                                    bb_rsi_tf_list=bb_rsi_tf_list)
-#         results = enricher.run(symbol=symbol)
-#         if results is not None:
-#             valid_df = next((r['df'] for r in results if r.get('df') is not None and not r['df'].empty), pd.DataFrame())
-#             df = valid_df
-#             df = df[pd.to_datetime(df["date"]).between(from_time, to_time)]
-#         else:
-#             df = pd.DataFrame()
-
-#         return df

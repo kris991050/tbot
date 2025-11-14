@@ -490,7 +490,7 @@ class ModelTrainer:
 
     def load(self):
         save_models_name = self.folder_names['models']
-        if save_models_name in self.paths:
+        if save_models_name in self.paths and os.path.exists(self.paths[save_models_name]):
             data = joblib.load(self.paths[save_models_name])
             self.model = data['model']
             self.feature_names = data['features']
@@ -508,6 +508,8 @@ class ModelTrainer:
             self.preprocessor.transform_features = data.get('transform_features', True)
             self._create_explainer()
             print(f"📦 Model loaded from: {self.paths[save_models_name]}")
+        else:
+            print(f"⚠️ No model found at {self.paths[save_models_name]}. No model loaded.")
 
 
 class StrategyModelComparator:

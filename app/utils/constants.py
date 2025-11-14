@@ -59,7 +59,7 @@ class CONSTANTS():
 
         WARMUP_MAP = {'1min':'1M', '5min':'3M', '15min':'4M', '1h':'6M', '4h':'1Y', '1D':'2Y', '1W':'5Y', '2min':'2M', '30min':'5M'}
         TIMEFRAMES_STD = ['1min', '5min', '15min', '1h', '4h', '1D', '1W']#list(WARMUP_MAP)
-        FORBIDDEN_TIMEFRAMES_POLYGON = ['1M']
+        FORBIDDEN_TIMEFRAMES_POLYGON = []#['1M']
         FORBIDDEN_SYMBOLS_POLYGON = ['QIPT', 'LIN']
 
         MODES = {'live': ['live', 'sim'], 'backtest': ['backtest', 'forward']}

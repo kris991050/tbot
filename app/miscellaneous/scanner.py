@@ -84,7 +84,7 @@ def scannerIBKR(ib):
     scanData = ib.reqScannerData(sub, [], tagValues) # the tagValues are given as 3rd argument; the 2nd argument must always be an empty list, (IB has not documented the 2nd argument and it's not clear what it does)
     symbols = [sd.contractDetails.contract.symbol for sd in scanData]
 
-    return symbols
+    return symbols, pd.DataFrame()
 
 
 def scannerTradingView(mode, exclude_BB_15=False, exclude_RSI_1=False, side="both"):
@@ -338,7 +338,7 @@ def scannerFinviz(mode):
         symbols = [item.text for item in table_items]
 
     # symbols = [item.text for item in earning_items]
-    return symbols
+    return symbols, pd.DataFrame()
 
 
 def scannerTradingTerminal(page):
@@ -370,7 +370,7 @@ def scannerTradingTerminal(page):
         # symbols = [item.text for item in table_items]
 
         symbols = []
-        return symbols
+        return symbols, pd.DataFrame()
 
     elif page == 'main':
         # Scrape from Trading Terminal main page
@@ -477,7 +477,7 @@ if __name__ == "__main__":
     if scanner_type == 'ibkr':
         # TWS Connection
         try:
-            symbolsIBKR = scannerIBKR(ib)
+            symbolsIBKR, _ = scannerIBKR(ib)
             if force: symbolsIBKR.append(force)
             print("Symbols from IBKR scanner =\n", symbolsIBKR, "\n\n")
 
@@ -486,7 +486,7 @@ if __name__ == "__main__":
 
     elif scanner_type == 'tt':
 
-        symbolsTT = scannerTradingTerminal("main")
+        symbolsTT, _ = scannerTradingTerminal("main")
         # symbolsTT = scannerTradingTerminal("scanners")
         if force: symbolsTT.append(force)
         print("\nSymbols from Trading Terminal scanner =\n")
@@ -538,7 +538,7 @@ if __name__ == "__main__":
         # table_dfTV = helpers.df_to_table(dfTV.round(2))
         # print("\n", table_dfTV, "\n")
 
-        symbolsFinviz = scannerFinviz("RE")
+        symbolsFinviz, _ = scannerFinviz("RE")
         if force: symbolsFinviz.append(force)
         print("\nSymbols from Finviz scanner =\n")
         print(symbolsFinviz)
@@ -546,7 +546,7 @@ if __name__ == "__main__":
 
     else:
         # symbolsFinviz = scannerFinviz("C5")
-        symbolsFinviz = scannerFinviz("RE")
+        symbolsFinviz, _ = scannerFinviz("RE")
         if force: symbolsFinviz.append(force)
         print("\nSymbols from Finviz scanner =\n")
         print(symbolsFinviz)

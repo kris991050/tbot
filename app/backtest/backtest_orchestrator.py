@@ -219,7 +219,8 @@ if __name__ == "__main__":
     pd.options.mode.chained_assignment = None # Disable Pandas warnings
 
 
-    paperTrading = 'live' not in args
+    paperTrading = not 'live' in args
+    local_ib = 'local' in args
     revised = 'revised' in args
     seed = next((int(arg[5:]) for arg in args if arg.startswith('seed=')), None)
     strategy_name = next((arg[9:] for arg in args if arg.startswith('strategy=')), '')
@@ -232,7 +233,7 @@ if __name__ == "__main__":
     selector = next((arg[9:] for arg in args if arg.startswith('selector=') and arg[9:] in ['rf', 'rfe', 'rfecv']), 'rf')
 
 
-    ib, _ = helpers.IBKRConnect_any(IB(), paper=paperTrading)
+    ib, _ = helpers.IBKRConnect_any(IB(), paper=paperTrading, remote=not local_ib)
 
     symbols = [symbol] if symbol else []
 

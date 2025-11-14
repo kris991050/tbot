@@ -15,7 +15,7 @@ from execution import trade_manager, trade_executor, orders
 class LiveWorker(live_loop_base.LiveLoopBase):
     def __init__(self, worker_type:str, wait_seconds:int=None, continuous:bool=True, single_symbol=None, ib_disconnect:bool=False, initialize:bool=True, 
                  tickers_list:dict={}, base_folder:str=None, config=None, strategy_name:str=None, stop:str=None, revised:bool=None, look_backward:str=None, 
-                 step_duration:str=None, live_mode:str=None, file_format: str=None, paper_trading:bool=None, timezone=None):
+                 step_duration:str=None, live_mode:str=None, file_format: str=None, paper_trading:bool=None, remote_ib:bool=None, timezone=None):
             
             super().__init__(wait_seconds=wait_seconds, continuous=continuous, single_symbol=single_symbol, ib_disconnect=ib_disconnect, 
                              live_mode=live_mode, config=config, paper_trading=paper_trading, timezone=timezone)
@@ -25,8 +25,9 @@ class LiveWorker(live_loop_base.LiveLoopBase):
             # self.logger = self._build_logger(args_logger, timezone)
             self.worker_type = helpers.set_var_with_constraints(worker_type, CONSTANTS.LIVE_WORKER_TYPES)
             self.base_folder = base_folder or PATHS.folders_path['live_data']
-            self.manager = trade_manager.TradeManager(self.ib, config=self.config, base_folder=self.base_folder)
-            self.logger = live_data_logger.LiveDataLogger(config=self.config)
+            # self.manager = trade_manager.TradeManager(self.ib, config=self.config, base_folder=self.base_folder)
+            # self.logger = live_data_logger.LiveDataLogger(config=self.config)
+            self.manager.base_folder = self.base_folder
             self.executor = trade_executor.TradeExecutor(self.ib, config=self.config)
             self.look_backward = look_backward or CONSTANTS.WARMUP_MAP[self.manager.strategy_instance.timeframe.pandas]
             # self.logger = live_data_logger.LiveDataLogger(self_live.mode, datetime.timedelta(sim_offset_seconds), timezone)
@@ -199,6 +200,7 @@ if __name__ == "__main__":
     pd.options.mode.chained_assignment = None # Disable Pandas warnings
 
     paper_trading = not 'live' in args
+    local_ib = 'local' in args
     revised = 'revised' in args
     continuous = not 'snapshot' in args
     no_initialize = 'noinit' in args
@@ -221,7 +223,7 @@ if __name__ == "__main__":
     # trade_manager = trade_manager.TradeManager(IB(), strategy_name, stop, revised=revised)
 
     worker = LiveWorker(worker_type=action, strategy_name=strategy_name, revised=revised, live_mode=mode, initialize=not no_initialize, 
-                              paper_trading=paper_trading, wait_seconds=wait_seconds, continuous=continuous)
+                              paper_trading=paper_trading, wait_seconds=wait_seconds, continuous=continuous, remote_ib=not local_ib)
     worker.run()
 
 

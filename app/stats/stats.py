@@ -43,6 +43,7 @@ if __name__ == "__main__":
     # Arguments management
     args = sys.argv
     paperTrading = not 'live' in args
+    local_ib = 'local' in args
     display_res = 'display' in args
     revised = 'revised' in args
     seed = next((int(arg[5:]) for arg in args if arg.startswith('seed=')), None)
@@ -55,7 +56,7 @@ if __name__ == "__main__":
 
 
     # TWS Connection
-    ib, ibConnection = helpers.IBKRConnect_any(IB(), paper=paperTrading)
+    ib, ibConnection = helpers.IBKRConnect_any(IB(), paper=paperTrading, remote=not local_ib)
 
     # ib = IB()
     # contract = Stock(symbol=symbol, exchange='SMART', currency='USD')

@@ -19,7 +19,7 @@ import live_data_logger, process_launcher, trading_config
 
 class LiveOrchestrator:
     def __init__(self, ib, max_fetchers:int=2, max_enrichers:int=2, strategy_name:str=None, stop=None, step_duration:str=None, revised:bool=None, 
-                 live_mode:str='live', paper_trading:bool=None, timezone=None):
+                 live_mode:str='live', paper_trading:bool=None, remote_ib:bool=None, timezone=None):
     # def __init__(self, ib, strategy_name:str, stop, target:str=None, timeframe:str=None, look_backward:str='1M', step_duration:str='1W', revised:bool=False, 
     #              max_fetchers:int=2, max_enrichers:int=2, mode:str='live', paper_trading:bool=True, timezone=None):
         self.ib = ib
@@ -53,15 +53,15 @@ class LiveOrchestrator:
         self.enrich_queue = self.logger.get_queue('enrich', lock=True)
         self.execite_queue = self.logger.get_queue('execut', lock=True)
 
-    @staticmethod
-    def _set_processes_params():
+    def _set_processes_params(self):
         date_folder = helpers.get_path_date_folder()
+        scan_rate_min = int(self.scan_rate / 60)
         return {
-            'scans': {'wait_seconds': 180, 'log_path': os.path.join(date_folder, 'scans_fetcher.log')}, 
-            'L2': {'wait_seconds': 300, 'log_path': os.path.join(date_folder, 'L2_fetcher.log')}, 
-            'fetch': {'wait_seconds': 2, 'log_path': os.path.join(date_folder, 'data_fetcher.log')}, 
-            'enrich': {'wait_seconds': 2, 'log_path': os.path.join(date_folder, 'data_enricher.log')},
-            'orchestrator': {'wait_seconds': 10}
+            'scans': {'wait_seconds': 3 * 60, 'log_path': os.path.join(date_folder, 'scans_fetcher.log')}, 
+            'L2': {'wait_seconds': 5 * 60, 'log_path': os.path.join(date_folder, 'L2_fetcher.log')}, 
+            'fetch': {'wait_seconds': 1 * scan_rate_min, 'log_path': os.path.join(date_folder, 'data_fetcher.log')}, 
+            'enrich': {'wait_seconds': 1 * scan_rate_min, 'log_path': os.path.join(date_folder, 'data_enricher.log')},
+            'orchestrator': {'wait_seconds': 5 * scan_rate_min}
         }
     
     def _launch_process(self, target, args=(), new_terminal=True, log_path=None, tail_logs=True):
@@ -89,26 +89,37 @@ class LiveOrchestrator:
             if tail_logs and log_path != os.devnull:
                 process_launcher.tail_log_in_new_terminal(log_path)
 
+    def _organize_tickers_list(self, symbols_scanner):
+        # Add new tickers
+        for symbol in symbols_scanner:
+            self.tickers_list = self.logger.load_tickers_list(lock=True)
+            if symbol not in self.tickers_list:
+                self.tickers_list[symbol] = self.logger.initialize_ticker()
+                self.logger.save_tickers_list(self.tickers_list, lock=True)
+            else:
+                if not self.tickers_list[symbol]['active']:
+                    self.tickers_list = self.logger.update_ticker(symbol, 'active', True, lock=True, log=True)
+        
+        if self.live_mode:
+            # Deactivate tickers not in scanner results anymore
+            self.tickers_list = self.logger.load_tickers_list(lock=True)
+            active_symbols = [symbol for symbol in self.tickers_list if self.tickers_list[symbol]['active']]
+            for symbol in active_symbols:
+                if symbol not in symbols_scanner:
+                    self.tickers_list = self.logger.update_ticker(symbol, 'active', False, lock=True, log=True)
+
     def run(self):
         print("🧠 Orchestration dispatcher started.")
 
         while True:
             now = helpers.calculate_now(self.config.sim_offset, self.manager.tz)
             print(f"\n⏱️ Current Time: {now}")
-            symbols_scanner = self.manager.get_scanner_data(now)
-
+            symbols_scanner = self.manager.get_scanner_data(now, use_daily_data=not self.live_mode)
+            print(f"📡 Fetched symbols from scanner:\n{symbols_scanner}")
 
             # symbols_scanner = ['CPB']#, 'SHFS', 'UUUU']
 
-            # Add new tickers
-            for symbol in symbols_scanner:
-                self.tickers_list = self.logger.load_tickers_list(lock=True)
-                if symbol not in self.tickers_list:
-                    self.tickers_list[symbol] = self.logger.initialize_ticker()
-                    self.logger.save_tickers_list(self.tickers_list, lock=True)
-                else:
-                    if not self.tickers_list[symbol]['active']:
-                        self.tickers_list = self.logger.update_ticker(symbol, 'active', True, lock=True, log=True)
+            self._organize_tickers_list(symbols_scanner)
 
             self.tickers_list = self.logger.load_tickers_list(lock=True)
             for symbol, info in list(self.tickers_list.items()):
@@ -259,14 +270,15 @@ if __name__ == "__main__":
     args = sys.argv
     pd.options.mode.chained_assignment = None # Disable Pandas warnings
 
-    paper_trading = 'live' not in args
+    paper_trading = not 'live' in args
+    local_ib = 'local' in args
     revised = 'revised' in args
     strategy_name = next((arg[9:] for arg in args if arg.startswith('strategy=')), None)
     mode = next((arg[5:] for arg in args if arg.startswith('mode=')), 'live')
 
     ib, _ = helpers.IBKRConnect_any(IB(), paper=paper_trading)
 
-    orchestrator = LiveOrchestrator(ib, strategy_name=strategy_name, revised=revised,  live_mode=mode, paper_trading=paper_trading)
+    orchestrator = LiveOrchestrator(ib, strategy_name=strategy_name, revised=revised,  live_mode=mode, paper_trading=paper_trading, remote_ib=not local_ib)
     orchestrator.run()
 
 
