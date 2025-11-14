@@ -3,13 +3,15 @@ from ib_insync import *
 parent_folder = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_folder)
 
-from utils import helpers, constants
+from utils import helpers
+from utils.constants import CONSTANTS
+from datetime import datetime
 import trading_config, live_data_logger
 
 
 class LiveLoopBase:
     def __init__(self, wait_seconds=None, continuous=True, single_symbol=None, ib_disconnect=False, live_mode:str='live', config=None, paper_trading=None, timezone=None):
-        self.live_mode = helpers.set_var_with_constraints(live_mode, constants.CONSTANTS.MODES['live'])
+        self.live_mode = helpers.set_var_with_constraints(live_mode, CONSTANTS.MODES['live'])
         self.config = self._resolve_config(config)
         self.wait_seconds = wait_seconds if wait_seconds else None
         self.continuous = continuous
@@ -55,8 +57,11 @@ class LiveLoopBase:
     
     def run(self):
 
-        counter = 10000
-        while counter > 0:
+        current_time = helpers.calculate_now(sim_offset=self.config.sim_offset, tz=self.config.timezone)
+        start_time = datetime.combine(current_time.date(), CONSTANTS.TH_TIMES['pre-market'])
+        end_time = datetime.combine(current_time.date(), CONSTANTS.TH_TIMES['end_of_tday'])
+
+        while start_time <= current_time < end_time:
             self._connect_ib()
 
             self._execute_main_task()  # Call the subclass-specific method
