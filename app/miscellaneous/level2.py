@@ -1,10 +1,11 @@
-import os, sys, numpy, datetime, math, csv, prettytable, traceback
+import os, sys, numpy, math, csv, prettytable, traceback
 # import backtrader as bt
 from ib_insync import *
 from matplotlib import pyplot
-from itertools import groupby
 from collections import defaultdict
-from utils import helpers, constants
+from utils import helpers
+from utils.constants import CONSTANTS
+from datetime import datetime
 # from scripts import newsScraper
 
 
@@ -57,9 +58,9 @@ class DummyMktDepth:
 
 class DomL2:
 
-    __slots__ = ('ib', 'symbol', 'date', 'data_folder', 'bids', 'asks', 'forexFactor', 'bidsAggregated', 'asksAggregated', '_bidsSizes', '_bidsPrices', '_asksSizes', '_asksPrices', 'bidsSumSizes', 'bidsSumPrices', 'asksSumSizes', 'asksSumPrices', 'bidsAvgSizes', 'bidsAvgPrices', 'asksAvgSizes', 'asksAvgPrices', 'bidsStdSizes', 'bidsStdPrices', 'asksStdSizes', 'asksStdPrices', 'sumSizes', 'avgSizes', 'stdSizes', 'dom_table', 'full_dom_table', 'sum_table')
+    __slots__ = ('ib', 'symbol', 'date', 'data_folder', 'bids', 'asks', 'timezone', 'forexFactor', 'bidsAggregated', 'asksAggregated', '_bidsSizes', '_bidsPrices', '_asksSizes', '_asksPrices', 'bidsSumSizes', 'bidsSumPrices', 'asksSumSizes', 'asksSumPrices', 'bidsAvgSizes', 'bidsAvgPrices', 'asksAvgSizes', 'asksAvgPrices', 'bidsStdSizes', 'bidsStdPrices', 'asksStdSizes', 'asksStdPrices', 'sumSizes', 'avgSizes', 'stdSizes', 'dom_table', 'full_dom_table', 'sum_table')
 
-    def __init__(self, ib, symbol, data_folder, bids=[], asks=[]):
+    def __init__(self, ib:IB, symbol:str, data_folder:str, bids:list=[], asks:list=[], timezone=CONSTANTS.TZ_WORK):
         self.ib = ib
         self.symbol = symbol.upper()
         self.forexFactor = 1000000 if symbol[:3] in helpers.get_forex_symbols_list() else 1
@@ -69,12 +70,13 @@ class DomL2:
         self.dom_table = prettytable.PrettyTable()
         self.full_dom_table = prettytable.PrettyTable()
         self.sum_table = prettytable.PrettyTable()
+        self.timezone = timezone
         self.__initiate(bids, asks)
 
     def __initiate(self, bids, asks):
         self.bids = bids
         self.asks = asks
-        self.date = helpers.date_local_to_EST(datetime.datetime.now())
+        self.date = datetime.now(tz=self.timezone)
         self.bidsAggregated = self.__aggregate_levels(bids, reverse=True)
         self.asksAggregated = self.__aggregate_levels(asks)
         self._bidsSizes = [level['size']/self.forexFactor for level in self.bidsAggregated]
@@ -93,7 +95,7 @@ class DomL2:
     def get_dom(self, currency='USD'):
         contract, mktData = helpers.get_symbol_mkt_data(self.ib, self.symbol, currency=currency)#, exchange="NASDAQ")
         MD = self.ib.reqMktDepth(contract, numRows=2000, isSmartDepth=True, mktDepthOptions=None)
-        self.ib.sleep(constants.CONSTANTS.PROCESS_TIME['long'])
+        self.ib.sleep(CONSTANTS.PROCESS_TIME['long'])
 
         self.__initiate(MD.domBids, MD.domAsks)
 
@@ -347,7 +349,7 @@ if __name__ == "__main__":
         print("\nFetching Market Depth for symbol ", symbol)
         domL2 = DomL2(ib, symbol, daily_data_folder)
         MD = domL2.get_dom()
-        ib.sleep(constants.CONSTANTS.PROCESS_TIME['medium'])
+        ib.sleep(CONSTANTS.PROCESS_TIME['medium'])
 
     if MD.domBids and MD.domAsks:
         # FD = ib.reqFundamentalData(contract, reportType='ReportsFinSummary', fundamentalDataOptions=[]) #https://ib-insync.readthedocs.io/api.html#ib_insync.ib.IB.reqMktDepth
@@ -416,7 +418,7 @@ print("\n\n")
 #                     print("\nFetching Market Depth for symbol ", symbol)
 #                     domL2 = DomL2(ib, symbol, daily_data_folder)
 #                     MD = domL2.get_dom()
-#                     ib.sleep(constants.CONSTANTS.PROCESS_TIME['medium'])
+#                     ib.sleep(CONSTANTS.PROCESS_TIME['medium'])
 
 #                 if MD.domBids and MD.domAsks:
 #                     # FD = ib.reqFundamentalData(contract, reportType='ReportsFinSummary', fundamentalDataOptions=[]) #https://ib-insync.readthedocs.io/api.html#ib_insync.ib.IB.reqMktDepth
