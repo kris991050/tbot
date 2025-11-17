@@ -63,7 +63,7 @@ class CONSTANTS():
         FORBIDDEN_SYMBOLS_POLYGON = ['QIPT', 'LIN']
 
         MODES = {'live': ['live', 'sim'], 'backtest': ['backtest', 'forward']}
-        LIVE_WORKER_TYPES = ['fetch', 'enrich', 'execut']
+        LIVE_ACTIONS = ['fetch', 'enrich', 'execut']
         FETCHER_TYPES = ['ibkr', 'polygon']
         DEFAULT_TIMEFRAME = {'multiplier': 1, 'unit': 'minute'}
 

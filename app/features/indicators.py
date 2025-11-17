@@ -674,6 +674,22 @@ class IndicatorsUtils:
                                                 file_format=file_format, data_type=data_type)
         helpers.save_df_to_file(df[['date', col]], data_path, file_format=file_format)
         return df
+    
+    @staticmethod
+    def resolve_sr_timeframes(timeframe:Timeframe, sr_tfs:list=None):
+        sr_tfs = sr_tfs if sr_tfs else [sr_setting['timeframe'] for sr_setting in CONSTANTS.SR_SETTINGS]
+        sr_tfs = sorted(sr_tfs, key=lambda tf: Timeframe(tf).to_seconds)
+        sr_tfs = list(dict.fromkeys(sr_tfs))  # Remove duplicates, while keeping elements order
+
+        tf_to_remove = []
+        for tf in sr_tfs:
+            timeframe_sr = Timeframe(tf)
+            if timeframe_sr.to_seconds <= timeframe.to_seconds:
+                print(f"Skipping timeframe {timeframe_sr}, as < current timeframe {timeframe}")
+                tf_to_remove.append(tf)
+                continue
+        sr_tfs = [tf for tf in sr_tfs.copy() if tf not in tf_to_remove]
+        return sr_tfs
 
 
 if __name__ == "__main__":

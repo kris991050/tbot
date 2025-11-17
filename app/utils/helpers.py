@@ -1,4 +1,4 @@
-import os, sys, datetime, time, requests, csv, re, prettytable, numpy as np, json, speedtest, pandas_market_calendars
+import os, sys, time, requests, csv, re, prettytable, numpy as np, json, speedtest, pandas_market_calendars
 import xml.etree.ElementTree as ET, traceback, speedtest, typing, chardet, pickle, filelock, yfinance, polygon, re
 import math, pandas as pd, psutil, gc#, dask.dataframe as dd
 from datetime import datetime, timedelta
@@ -10,6 +10,7 @@ sys.path.append(parent_folder)
 from miscellaneous import newsScraper
 from utils.timeframe import Timeframe
 from utils.constants import CONSTANTS, PATHS, FORMATS
+from utils import logs
 
 # Doc ib_insync: https://ib-insync.readthedocs.io/api.html
 # Doc IBKR API: https://interactivebrokers.github.io/tws-api/introduction.html
@@ -27,7 +28,13 @@ from utils.constants import CONSTANTS, PATHS, FORMATS
 def sleep_display(time_wait, ib=None):
     print("⌛ Waiting ", time_wait, " sec...")
     for i in range(time_wait):
-        print("\r{} seconds.".format(time_wait - i), end='')
+        message = "\r{} seconds.".format(time_wait - i)
+        if isinstance(sys.stdout, logs.DualLogger):
+            sys.stdout.write(message, no_log=True)
+            # print(message, end='', no_log=True)
+        else:
+            print(message, end='')
+
         if not ib: time.sleep(1)
         else: ib.sleep(1)
 
@@ -184,6 +191,19 @@ def get_path_daily_data_folder(date=None, create_if_none=True, local=False):
         os.mkdir(daily_data_folder_path)
 
     return daily_data_folder_path
+
+
+def get_path_daily_logs_folder(date=None, create_if_none=True, local=False):
+
+    date = date or datetime.now(CONSTANTS.TZ_WORK)
+    if not local: root_folder_path = get_path_date_folder(date, create_if_none, local)
+    else: root_folder_path = os.getcwd()
+    daily_logs_folder_path = os.path.join(root_folder_path, 'live_logs')
+
+    if not os.path.exists(daily_logs_folder_path) and create_if_none:
+        os.mkdir(daily_logs_folder_path)
+
+    return daily_logs_folder_path
 
 
 def path_current_setup(path_current_file, ch_dir=True, print_path=True):
@@ -490,7 +510,8 @@ def save_to_daily_csv(ib, symbols, file_name):
         for i, row in enumerate(read_csv_file(symbols_csv_path)):
             if i > 0 and row != [] and row[0] != '': symbols_existing.append(row[1])
 
-        date_now = date_local_to_EST(datetime.now())
+        # date_now = date_local_to_EST(datetime.now())
+        date_now = datetime.now(CONSTANTS.TZ_WORK)
         with open(symbols_csv_path, mode='a') as file:
             file_writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
             for symbol in symbols:
@@ -565,7 +586,7 @@ def date_to_unix(date):
     return int(date_obj.timestamp() * 1000)
 
 
-def calculate_now(sim_offset=timedelta(0), tz=CONSTANTS.TZ_WORK):
+def calculate_now(sim_offset=timedelta(0), tz=CONSTANTS.TZ_WORK) -> datetime:
         # offset = sim_offset if mode == 'sim' else timedelta(days=0) if mode == 'live' else None
         return datetime.now(tz) - sim_offset
 
@@ -631,9 +652,8 @@ def get_market_holidays(start_date, end_date, exchange='NYSE'):
     return pd.to_datetime(holidays_in_range)
 
 
-def is_between_market_times(start_label, end_label, timezone=None):
-    timezone = timezone or CONSTANTS.TZ_WORK
-    now = pd.Timestamp.now(tz=timezone).time()
+def is_between_market_times(start_label, end_label, now:datetime=None, timezone=CONSTANTS.TZ_WORK):
+    now = now.time() if now else datetime.now(tz=timezone).time()
     return CONSTANTS.TH_TIMES[start_label] < now < CONSTANTS.TH_TIMES[end_label]
 
 

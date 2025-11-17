@@ -105,8 +105,8 @@ class TradeEvaluator:
         return pd.concat(all_group_summaries, ignore_index=True)
 
     @staticmethod
-    def log_trade(direction, trade_log, entry_idx, exit_idx, df, entry_price, exit_price, quantity, entry_prediction, stop_price, reason2close, 
-                  symbol, entry_exec_price, exit_exec_price, entry_commission, exit_commission, rounding=2):
+    def log_trade(direction, trade_log, entry_idx, exit_idx, df, entry_price, exit_price, quantity, decision_prediction, entry_prediction, 
+                  stop_price, reason2close, symbol, entry_exec_price, exit_exec_price, entry_commission, exit_commission, rounding=2):
         trade_df = df.iloc[entry_idx:exit_idx + 1]
         close_prices = trade_df['close']
         highs = trade_df['high']
@@ -144,7 +144,8 @@ class TradeEvaluator:
             'entry_price': round(entry_price, rounding) if entry_price is not None else None,
             'exit_price': round(exit_price, rounding) if exit_price is not None else None,
             'quantity': quantity,
-            'prediction': round(entry_prediction, rounding) if entry_prediction is not None else None,
+            'decision_prediction': round(decision_prediction, rounding) if decision_prediction is not None else None,
+            'entry_prediction': round(entry_prediction, rounding) if entry_prediction is not None else None,
             'predicted_drawdown': round(predicted_drawdown, rounding) if predicted_drawdown is not None else None,
             'estimated_reward': round(expected_reward, rounding) if expected_reward is not None else None,
             'estimated_rrr': round(rrr, rounding) if rrr is not None else None,

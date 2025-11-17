@@ -1,37 +1,30 @@
-import sys, os, pandas as pd, logging
+import sys, os, pandas as pd
 from ib_insync import *
 parent_folder = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_folder)
 
-import live_loop_base, live_data_logger
+import live_loop_base
 from data import hist_market_data_handler
-from utils import helpers
+from utils import helpers, logs
 from datetime import datetime
 from utils.constants import CONSTANTS, PATHS
 from utils.timeframe import Timeframe
-from execution import trade_manager, trade_executor, orders
+from execution import trade_executor, orders
 
 
 class LiveWorker(live_loop_base.LiveLoopBase):
-    def __init__(self, worker_type:str, wait_seconds:int=None, continuous:bool=True, single_symbol=None, ib_disconnect:bool=False, initialize:bool=True, 
+    def __init__(self, action:str, wait_seconds:int=None, continuous:bool=True, single_symbol=None, ib_disconnect:bool=False, initialize:bool=True, 
                  tickers_list:dict={}, base_folder:str=None, config=None, strategy_name:str=None, stop:str=None, revised:bool=None, look_backward:str=None, 
                  step_duration:str=None, live_mode:str=None, file_format: str=None, paper_trading:bool=None, remote_ib:bool=None, timezone=None):
             
-            super().__init__(wait_seconds=wait_seconds, continuous=continuous, single_symbol=single_symbol, ib_disconnect=ib_disconnect, 
-                             live_mode=live_mode, config=config, paper_trading=paper_trading, timezone=timezone)
-            # self.manager = trade_manager.TradeManager(self.ib, strategy_name, stop, revised=revised, look_backward=look_backward, 
-            #                                           step_duration=step_duration, timezone=timezone)
-            # self.manager = self._build_manager(args_manager, self.ib, timezone)
-            # self.logger = self._build_logger(args_logger, timezone)
-            self.worker_type = helpers.set_var_with_constraints(worker_type, CONSTANTS.LIVE_WORKER_TYPES)
+            super().__init__(worker_type=f"{action}er", wait_seconds=wait_seconds, continuous=continuous, single_symbol=single_symbol, ib_disconnect=ib_disconnect, 
+                             live_mode=live_mode, config=config, paper_trading=paper_trading, remote_ib=remote_ib, timezone=timezone)
+            
+            self.action = helpers.set_var_with_constraints(action, CONSTANTS.LIVE_ACTIONS)
             self.base_folder = base_folder or PATHS.folders_path['live_data']
-            # self.manager = trade_manager.TradeManager(self.ib, config=self.config, base_folder=self.base_folder)
-            # self.logger = live_data_logger.LiveDataLogger(config=self.config)
             self.manager.base_folder = self.base_folder
             self.executor = trade_executor.TradeExecutor(self.ib, config=self.config)
             self.look_backward = look_backward or CONSTANTS.WARMUP_MAP[self.manager.strategy_instance.timeframe.pandas]
-            # self.logger = live_data_logger.LiveDataLogger(self_live.mode, datetime.timedelta(sim_offset_seconds), timezone)
-            # self.file_format = file_format
             self.initialize = initialize
             # self.queue = queue or multiprocessing.Queue()
             self.tickers_list = tickers_list or self.logger.load_tickers_list(lock=True)
@@ -102,50 +95,52 @@ class LiveWorker(live_loop_base.LiveLoopBase):
         else: return False
 
     def _execute_symbol(self, symbol):
-        logging.basicConfig(filename=self.logger.trade_log_file_path, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s' )
+        # logging.basicConfig(filename=self.logger.trade_log_file_path, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s' )
+        with logs.LogContext(self.logger.trade_log_file_path, overwrite=True):  # Logging trades specifically in separate trade log
         
-        entry_condition, last_row = self._evaluate_entry(symbol)
-        if entry_condition:
-            print(f"Executing Order for {symbol}")
-            stop_price = self.manager.resolve_stop_price(last_row)
-            target_price = last_row[self.manager.strategy_instance.params['target_indicator']] if self.manager.strategy_instance.params['target_indicator'] else ''
-            quantity = self.manager.evaluate_quantity(last_row['model_prediction'])
-            # values = self._create_trade_params(symbol, stop_price, target_price, quantity)
-            oorder = trade_executor.OOrder(symbol=symbol, stop_loss=stop_price, take_profit=target_price, quantity=quantity, config=self.config)
-            
-            order, TPSL_order = self.executor.execute_order(self.manager.direction, oorder)
-            self.ib.sleep(CONSTANTS.PROCESS_TIME['long'])
-            if order is not None and hasattr(order, 'orderStatus'):
-                print(f"Order placed with status {order.orderStatus.status}")
-                # print(TPSL_order.orderStatus.status)
-                if order.orderStatus.status in ['Filled', 'Submitted']:
-                    # Log order execution
-                    message = f"Executed order for {symbol} with quantity: {quantity}, stop price: {stop_price}, target price: {target_price}, model prediction: {last_row['model_prediction']}."
-                    logging.info(message)
-                    print(message)
-                    self.tickers_list = self.logger.update_ticker(symbol, 'priority', 4, lock=True, log=True)
+            entry_condition, last_row = self._evaluate_entry(symbol)
+            if entry_condition:
+                print(f"Executing Order for {symbol}")
+                stop_price = self.manager.resolve_stop_price(last_row)
+                target_price = last_row[self.manager.strategy_instance.params['target_indicator']] if self.manager.strategy_instance.params['target_indicator'] else ''
+                quantity = self.manager.evaluate_quantity(last_row['model_prediction'])
+                # values = self._create_trade_params(symbol, stop_price, target_price, quantity)
+                oorder = trade_executor.OOrder(symbol=symbol, stop_loss=stop_price, take_profit=target_price, quantity=quantity, config=self.config)
                 
-                open_position = orders.get_positions_by_symbol(self.ib, symbol)
-                print(open_position)
-            else:
-                print(f"Could not execute order for {symbol}")
+                order, TPSL_order = self.executor.execute_order(self.manager.direction, oorder)
+                self.ib.sleep(CONSTANTS.PROCESS_TIME['long'])
+                if order is not None and hasattr(order, 'orderStatus'):
+                    print(f"Order placed with status {order.orderStatus.status}")
+                    # print(TPSL_order.orderStatus.status)
+                    if order.orderStatus.status in ['Filled', 'Submitted']:
+                        # Log order execution
+                        message = f"Executed order for {symbol} with quantity: {quantity}, stop price: {stop_price}, target price: {target_price}, model prediction: {last_row['model_prediction']}."
+                        # logging.info(message)
+                        print(message)
+                        self.tickers_list = self.logger.update_ticker(symbol, 'priority', 4, lock=True, log=True)
+                    
+                    open_position = orders.get_positions_by_symbol(self.ib, symbol)
+                    print(open_position)
+                else:
+                    print(f"Could not execute order for {symbol}")
 
-            return last_row.to_frame().T
-        else: return pd.DataFrame()
+                return last_row.to_frame().T
+            else:
+                return pd.DataFrame()
 
     def _run(self):
         df = pd.DataFrame()
 
-        queue = self.logger.get_queue(self.worker_type, lock=True)
+        queue = self.logger.get_queue(self.action, lock=True)
         if not queue:
-            print(f"{self.worker_type.capitalize()} queue empty")
+            print(f"{self.action.capitalize()} queue empty")
             self.wait_seconds = self.base_wait_seconds * 3
             return df
         else:
-            print(f"Current {self.worker_type} queue: {queue}")
+            print(f"Current {self.action} queue: {queue}")
             self.wait_seconds = self.base_wait_seconds
 
-        symbol = self.logger.pop_queue(queue, self.worker_type, lock=True)
+        symbol = self.logger.pop_queue(queue, self.action, lock=True)
 
         self.tickers_list = self.logger.load_tickers_list(lock=True)
         if symbol not in self.tickers_list:
@@ -155,7 +150,7 @@ class LiveWorker(live_loop_base.LiveLoopBase):
         init = not self.tickers_list[symbol]['initialized']
         if init and not self.initialize:
             print(f"Passing {symbol} as initialize option not active")
-            self.logger.put_queue(symbol, self.worker_type, lock=True)
+            self.logger.put_queue(symbol, self.action, lock=True)
             return df
         
         trig_time = helpers.calculate_now(self.config.sim_offset, self.config.timezone)
@@ -166,28 +161,28 @@ class LiveWorker(live_loop_base.LiveLoopBase):
         # print("tickers_list = ", self.tickers_list)
         print("init = ", init)
         print("trig_time / from_time = ", trig_time, "     ", from_time)
-        if not self.tickers_list[symbol][f'{self.worker_type}ing']:
-            self.tickers_list = self.logger.update_ticker(symbol, f'{self.worker_type}ing', True, lock=True, log=True)
+        if not self.tickers_list[symbol][f'{self.action}ing']:
+            self.tickers_list = self.logger.update_ticker(symbol, f'{self.action}ing', True, lock=True, log=True)
 
-            if self.worker_type == 'fetch':
+            if self.action == 'fetch':
                 # df = self._fetch_symbol(symbol, trig_time, from_time, init)
                 df = self._fetch_symbol(symbol, from_time, trig_time, init)
 
-            elif self.worker_type == 'enrich':
+            elif self.action == 'enrich':
                 df = self._enrich_symbol(symbol, from_time, trig_time, init)
                 if self._evaluate_discard(symbol, df):
                     self.tickers_list = self.logger.update_ticker(symbol, 'priority', 0, lock=True, log=True)
             
-            elif self.worker_type == 'execut':
+            elif self.action == 'execut':
                 df = self._execute_symbol(symbol)
 
             else:
                  print("Handler mode must be 'fetch' or 'enrich'")
             
-            self.tickers_list = self.logger.update_ticker(symbol, f'{self.worker_type}ing', False, lock=True, log=True)
+            self.tickers_list = self.logger.update_ticker(symbol, f'{self.action}ing', False, lock=True, log=True)
 
             if not df.empty:
-                self.tickers_list = self.logger.update_ticker(symbol, f'last_{self.worker_type}ed', df['date'].iloc[-1], lock=True, log=True)
+                self.tickers_list = self.logger.update_ticker(symbol, f'last_{self.action}ed', df['date'].iloc[-1], lock=True, log=True)
 
         return df
     
@@ -222,7 +217,7 @@ if __name__ == "__main__":
 
     # trade_manager = trade_manager.TradeManager(IB(), strategy_name, stop, revised=revised)
 
-    worker = LiveWorker(worker_type=action, strategy_name=strategy_name, revised=revised, live_mode=mode, initialize=not no_initialize, 
+    worker = LiveWorker(action=action, strategy_name=strategy_name, revised=revised, live_mode=mode, initialize=not no_initialize, 
                               paper_trading=paper_trading, wait_seconds=wait_seconds, continuous=continuous, remote_ib=not local_ib)
     worker.run()
 

@@ -3,16 +3,16 @@ import sys, os
 
 class DualLogger:
     def __init__(self, log_path, overwrite=False):
-        self.terminal = sys.stdout
         os.makedirs(os.path.dirname(log_path), exist_ok=True)
-
+        self.terminal = sys.stdout
         mode = 'w' if overwrite else 'a'
         self.log_file = open(log_path, mode, buffering=1, encoding='utf-8')  # Line-buffered
         sys.stdout = self  # redirect stdout
 
-    def write(self, message):
+    def write(self, message, no_log=False):
         self.terminal.write(message)
-        self.log_file.write(message)
+        if not no_log:
+            self.log_file.write(message)
 
     def flush(self):
         self.terminal.flush()

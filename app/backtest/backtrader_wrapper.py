@@ -47,6 +47,7 @@ class BacktraderStrategyWrapper(bt.Strategy):
         self.entry_idx = None
         self.exit_idx = None
         self.entry_time = None
+        self.decision_prediction = None
         self.entry_prediction = None
         self.quantity = None
 
@@ -100,9 +101,10 @@ class BacktraderStrategyWrapper(bt.Strategy):
             return
         
         symbol = self.datas[0]._name
-        trade_evaluator.TradeEvaluator.log_trade(self.manager.direction, self.trades, self.entry_idx, self.exit_idx, self.df, self.entry_price, self.exit_price, 
-                                    self.quantity, self.entry_prediction, self.active_stop_price, self.exit_reason, symbol, self.entry_exec_price, 
-                                    self.exit_exec_price, self.entry_commission, self.exit_commission)
+        trade_evaluator.TradeEvaluator.log_trade(self.manager.direction, self.trades, self.entry_idx, self.exit_idx, self.df, 
+                                                 self.entry_price, self.exit_price, self.quantity, self.decision_prediction, 
+                                                 self.entry_prediction, self.active_stop_price, self.exit_reason, symbol, 
+                                                 self.entry_exec_price, self.exit_exec_price, self.entry_commission, self.exit_commission)
     
     def notify_order(self, order):
         if order.status in [order.Submitted, order.Accepted]:
@@ -189,11 +191,15 @@ class BacktraderStrategyWrapper(bt.Strategy):
                 self.entry_price = curr_row['close']
                 self.entry_idx = curr_idx
                 self.entry_time = curr_row['date']
+                self.decision_prediction = decision_row['model_prediction']
                 self.entry_prediction = curr_row['model_prediction']
                 self.quantity = self.manager.evaluate_quantity(self.entry_prediction)
                 self.order = self.execute_order('entry')
+
                 if hasattr(self.manager.strategy_instance.target_handler, 'set_entry_time'):
                     self.manager.strategy_instance.target_handler.set_entry_time(curr_row['date'])
+                if hasattr(self.manager.strategy_instance.target_handler, 'set_target_price'):
+                    self.manager.strategy_instance.target_handler.set_target_price(row=decision_row)
 
                 # Resolve stop once here
                 self.active_stop_price = self.manager.resolve_stop_price(curr_row, self.active_stop_price)

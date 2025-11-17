@@ -76,6 +76,7 @@ if __name__ == "__main__":
     to_time = pd.to_datetime('2025-10-01T19:59:59').tz_localize(CONSTANTS.TZ_WORK)#pd.to_datetime('2025-05-01T19:59:59').tz_localize(CONSTANTS.TZ_WORK)
     from_time = pd.to_datetime('2020-01-01T19:59:59').tz_localize(CONSTANTS.TZ_WORK)#pd.to_datetime('2020-01-01T04:00:00').tz_localize(CONSTANTS.TZ_WORK)
     symbols = build_symbols_list(hist_folder, to_time, from_time, seed, file_format) if not single_symbol else [single_symbol]
+
     if 'bb_rsi_reversal' in strategy:
 
         mtf = None
@@ -85,8 +86,16 @@ if __name__ == "__main__":
     if 'sr_bounce' in strategy:
 
         mtf = None
-        strategy_func = trade_manager.get_strategy_instance(strategy_name=strategy, revised=revised, rsi_threshold=75, cam_M_threshold=4)
-        config = [{'timeframe': strategy_func.timeframe, 'targets': [strategy_func.target_handler], 'mtf': mtf}]
+        strategy_func_list = []
+        target_list = []
+        for ttf in [1, 2.5, 5, 7.5, 10]:
+            strategy_func = trade_manager.get_strategy_instance(strategy_name=strategy, revised=revised, cam_M_threshold=3, target_factor=ttf)
+            # strategy_func = trade_manager.get_strategy_instance(strategy_name=strategy, revised=revised, cam_M_threshold=3, max_time_factor=ttf)
+            strategy_func_list.append(strategy_func)
+            target_list.append(strategy_func.target_handler)
+        # strategy_func = trade_manager.get_strategy_instance(strategy_name=strategy, revised=revised, cam_M_threshold=3, target_factor=5, max_time_factor=50)
+        # config = [{'timeframe': strategy_func.timeframe, 'targets': [strategy_func.target_handler], 'mtf': mtf}]
+        config = [{'timeframe': strategy_func.timeframe, 'targets': target_list, 'mtf': mtf}]
 
     elif 'breakouts' in strategy:
 

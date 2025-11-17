@@ -45,7 +45,7 @@ class TradingConfig:
 
         # Simualtion config
         self.live_mode = helpers.set_var_with_constraints(live_mode, CONSTANTS.MODES['live']) or 'live'
-        self.sim_start = self.timezone.localize(datetime.datetime(2025, 11, 6, 10, 0, 0))
+        self.sim_start = self.timezone.localize(datetime.datetime(2025, 11, 14, 10, 0, 0))
         self.sim_max_time = datetime.timedelta(hours=4, minutes=0)
         self.set_sim_offset()
     

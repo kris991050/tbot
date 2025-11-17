@@ -15,7 +15,8 @@ from ml import ml_trainer
 from miscellaneous import scanner
 
 
-def get_strategy_instance(strategy_name:str, revised:bool=False, rsi_threshold:int=75, cam_M_threshold:int=4, time_target_factor:int=10):
+def get_strategy_instance(strategy_name:str, revised:bool=False, rsi_threshold:int=75, cam_M_threshold:int=4, target_factor:float=5, 
+                          max_time_factor:int=50):
     
     for direction in ['bull', 'bear']:
         for tf in ['1min', '2min', '5min', '15min', '1h']:
@@ -23,10 +24,10 @@ def get_strategy_instance(strategy_name:str, revised:bool=False, rsi_threshold:i
                 return bb_rsi_reversal_strategy.BBRSIReversalStrategy(direction=direction, timeframe=Timeframe(tf), rsi_threshold=rsi_threshold, 
                                                                       cam_M_threshold=cam_M_threshold, revised=revised)
         
-        for tf in ['15min', '1h']:
+        for tf in ['15min', '1h', '4h', '1D']:
             if f'sr_bounce_{tf}_{direction}' in strategy_name:
                 return sr_bounce_strategy.SRBounceStrategy(direction=direction, timeframe=Timeframe(tf), cam_M_threshold=cam_M_threshold, 
-                                                           time_target_factor=time_target_factor, revised=revised)
+                                                           revised=revised, target_factor=target_factor, max_time_factor=max_time_factor)
             
     raise ValueError(f"Strategy '{strategy_name}' not recognized")
 
@@ -65,7 +66,7 @@ class TradeManager:
 
         # elif isinstance(self.stop, list) and all(isinstance(s, str) for s in self.stop):
         elif self.config.stop == 'levels':
-            stop_hdlr = target_handler.NextLevelStopLossHandler()
+            stop_hdlr = target_handler.NextLevelStopLossHandler(timeframe=self.strategy_instance.timeframe)
         elif self.config.stop == 'predicted_drawdown':
             stop_hdlr = target_handler.PredictedDrawdownStopLossHandler(dd_col='predicted_drawdown')
         elif self.config.stop == 'hod':
@@ -154,17 +155,17 @@ class TradeManager:
                 return -1
         return None
 
-    def resolve_stop_price(self, curr_row, active_stop_price=None):
+    def resolve_stop_price(self, row:pd.Series, active_stop_price:float=None):
         """
         Resolve stop-loss price at trade entry and store it.
         """
         if active_stop_price is None and self.stop_handler is not None:
             if hasattr(self.stop_handler, 'resolve_stop_price'):
-                active_stop_price, _ = self.stop_handler.resolve_stop_price(curr_row, self.direction)
+                active_stop_price, _ = self.stop_handler.resolve_stop_price(row, self.direction)
 
         return active_stop_price
 
-    def assess_reason2close(self, curr_row, prev_row, active_stop_price):
+    def assess_reason2close(self, curr_row:pd.Series, prev_row:pd.Series, active_stop_price:float):
         """
         Determines if the current trade should be closed due to:
         - Cached stop-loss value
@@ -179,24 +180,33 @@ class TradeManager:
 
         return stop_reason or target_reason
 
-    def _evaluate_prediction(self, prediction, threshold=None):
+    def _evaluate_prediction(self, prediction:float, threshold:float=None):
         if not prediction:
             return None
         threshold = threshold or self.config.pred_th
         return prediction >= threshold if threshold else True
 
-    def _evaluate_RRR(self, curr_row, stop_price):
+    def _evaluate_RRR(self, row:pd.Series, stop_price:float):
+        # Get target from strategy, depending on target type
+        if hasattr(self.strategy_instance.target_handler, 'set_target_price'):
+            self.strategy_instance.target_handler.set_target_price(row)
+        if hasattr(self.strategy_instance.target_handler, 'target_price'):
+            target = self.strategy_instance.target_handler.target_price
+        elif self.strategy_instance.target_handler.target_str in row:
+            target = row[self.strategy_instance.target_handler.target_str]
+        else:
+            target = None
+        
         # Assess Risk to Reward Ratio
-        target = curr_row[self.strategy_instance.target_handler.target_str]
-        expected_reward = abs(target - curr_row['close']) if target and target > 0 else None
-        risk = abs(curr_row['close'] - stop_price) if stop_price and stop_price > 0 else None
+        expected_reward = abs(target - row['close']) if target and target > 0 else None
+        risk = abs(row['close'] - stop_price) if stop_price and stop_price > 0 else None
         rrr = expected_reward / risk if risk and expected_reward else float('inf')
         
         if self.config.rrr_threshold and rrr < self.config.rrr_threshold:
             return False, rrr  # Skip trade
         return True, rrr
 
-    def evaluate_quantity(self, prediction):
+    def evaluate_quantity(self, prediction:float):
         if isinstance(self.config.size, int):
             return self.config.size
 
@@ -209,7 +219,7 @@ class TradeManager:
             else:
                 return 1
 
-    def apply_model_predictions(self, df, symbol, return_proba=True, shift_features=False):
+    def apply_model_predictions(self, df:pd.DataFrame, symbol:str, return_proba:bool=True, shift_features:bool=False):
         if 'market_cap_cat' not in df.columns and 'market_cap' in df.attrs:
             df['market_cap_cat'] = helpers.categorize_market_cap(df.attrs['market_cap'])
         else:
@@ -232,6 +242,10 @@ class TradeManager:
 
         is_triggered = self.strategy_instance.evaluate_trigger(row)
         is_predicted = self._evaluate_prediction(row.get('model_prediction'), self.config.pred_th)
+        # if is_triggered and is_predicted:
+        #     print(row['date'])
+        #     print()
+        #     print()
         is_RRR, rrr = self._evaluate_RRR(row, stop_price)
         if display_triggers and is_triggered:
             trigger_cols = [col for col in self.strategy_instance.required_columns if not any(keyword in col for keyword in ['open', 'high', 'low', 'volume'])]
@@ -262,7 +276,8 @@ class TradeManager:
         # return [symbol for symbol in df_csv_file['Symbol']]
     
     def scan_bb_rsi_reversal(self):
-        if not helpers.is_between_market_times('pre-market', 'end_of_tday', self.config.timezone):
+        now = helpers.calculate_now(sim_offset=self.config.sim_offset, tz=self.config.timezone)
+        if not helpers.is_between_market_times('pre-market', 'end_of_tday', now=now, timezone=self.config.timezone):
             return []
         print('\n======== FETCHING RSI REVERSALS ========\n')
         symbols, _ = scanner.scannerTradingView("RSI-Reversal")#scanner.scannerFinviz("RE")
@@ -302,8 +317,9 @@ class TradeManager:
         
         return df
 
-    def enrich_df(self, symbol, file_format:str='parquet', block_add_sr:bool=False, base_timeframe:Timeframe=None, from_time:datetime=None, to_time:datetime=None):
-        feature_types, mtf = self._resolve_features()
+    def enrich_df(self, symbol, file_format:str='parquet', block_add_sr:bool=False, base_timeframe:Timeframe=None, from_time:datetime=None, 
+                  to_time:datetime=None, select_features:bool=True):
+        feature_types, mtf = self._resolve_features() if select_features else ['all'], None
         enricher = hist_market_data_handler.HistMarketDataEnricher(self.ib, timeframe=self.strategy_instance.timeframe, base_timeframe=base_timeframe, 
                                                                    feature_types=feature_types, mtf=mtf, file_format=file_format, base_folder=self.base_folder, 
                                                                    validate=False, block_add_sr=block_add_sr, timezone=self.tz)

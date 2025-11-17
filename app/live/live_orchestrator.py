@@ -114,7 +114,7 @@ class LiveOrchestrator:
         while True:
             now = helpers.calculate_now(self.config.sim_offset, self.manager.tz)
             print(f"\n⏱️ Current Time: {now}")
-            symbols_scanner = self.manager.get_scanner_data(now, use_daily_data=not self.live_mode)
+            symbols_scanner = self.manager.get_scanner_data(now, use_daily_data=self.live_mode=='sim')
             print(f"📡 Fetched symbols from scanner:\n{symbols_scanner}")
 
             # symbols_scanner = ['CPB']#, 'SHFS', 'UUUU']
@@ -276,7 +276,7 @@ if __name__ == "__main__":
     strategy_name = next((arg[9:] for arg in args if arg.startswith('strategy=')), None)
     mode = next((arg[5:] for arg in args if arg.startswith('mode=')), 'live')
 
-    ib, _ = helpers.IBKRConnect_any(IB(), paper=paper_trading)
+    ib, _ = helpers.IBKRConnect_any(IB(), paper=paper_trading, remote=not local_ib)
 
     orchestrator = LiveOrchestrator(ib, strategy_name=strategy_name, revised=revised,  live_mode=mode, paper_trading=paper_trading, remote_ib=not local_ib)
     orchestrator.run()

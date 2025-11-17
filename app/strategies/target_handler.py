@@ -9,10 +9,11 @@ sys.path.append(parent_folder)
 from utils import helpers
 from utils.constants import CONSTANTS
 from utils.timeframe import Timeframe
+from features import indicators
 
 
 
-def resolve_max_time(trigger_time:pd.Timestamp, max_time, timezone=CONSTANTS.TZ_WORK) -> Optional[pd.Timestamp]:
+def resolve_max_time(trigger_time:pd.Timestamp, max_time:timedelta, timezone=CONSTANTS.TZ_WORK) -> Optional[pd.Timestamp]:
     """
     Resolves a max_time constraint relative to trigger_time.
 
@@ -34,14 +35,29 @@ def resolve_max_time(trigger_time:pd.Timestamp, max_time, timezone=CONSTANTS.TZ_
     raise ValueError(f"Invalid max_time: {max_time}")
 
 
+def resolve_level_types(timeframe:Timeframe):
+    sr_tfs = indicators.IndicatorsUtils.resolve_sr_timeframes(timeframe)
+    level_types = [f'sr_{sr_tf}' for sr_tf in sr_tfs]
+    if timeframe.to_seconds < Timeframe('1M').to_seconds:
+        level_types.extend(['levels_M', 'pivots_M'])
+    if timeframe.to_seconds < Timeframe('1D').to_seconds:
+        level_types.extend(['pivots', 'pivots_D', 'levels'])
+    return level_types
+
 
 class TargetHandler(ABC):
     """
     Abstract base class for handling different types of post-trigger targets (time-based, event-based, etc.).
     """
-    def __init__(self):
+    def __init__(self, max_time:timedelta=None, timezone=CONSTANTS.TZ_WORK):
         self.target_str = None
         self.required_columns = []
+        self.entry_time = None
+        self.timezone = timezone
+        self.max_time = max_time
+    
+    def set_entry_time(self, time:pd.Timestamp):
+        self.entry_time = time
 
     @abstractmethod
     def get_target_time(self, df:pd.DataFrame, trigger_time:pd.Timestamp) -> pd.Timestamp:
@@ -54,50 +70,47 @@ class TargetHandler(ABC):
         """
         pass
 
-    @staticmethod
-    def from_target(target:Union[str, pd.Timedelta, 'TargetHandler'], timezone:pytz=CONSTANTS.TZ_WORK) -> 'TargetHandler':
-        """
-        Factory method to return appropriate TargetHandler based on `target` input.
-        """
-        if isinstance(target, TargetHandler):
-            return target
-        elif isinstance(target, pd.Timedelta):
-            return TimeDeltaTargetHandler(target, timezone=timezone)
-        elif isinstance(target, str):
-            lower = target.lower()
-            if lower in ['eod', 'eod_rth']:
-                return EODTargetHandler(rth_only=(lower == 'eod_rth'), timezone=timezone)
-            elif 'vwap' in lower:
-                timeframe = helpers.extract_timeframe_from_df_column(lower)
-                return VWAPCrossTargetHandler(timeframe=timeframe, max_time='eod_rth', timezone=timezone)
-            else:
-                # Try parsing string like "5 min", "1h", etc.
-                try:
-                    parsed_delta = pd.to_timedelta(target)
-                    return TimeDeltaTargetHandler(parsed_delta)
-                except ValueError:
-                    raise ValueError(f"Unsupported target type: {target}")
-        else:
-            raise ValueError(f"Unsupported target type: {target}")
+    # @staticmethod
+    # def from_target(target:Union[str, pd.Timedelta, 'TargetHandler'], timezone:pytz=CONSTANTS.TZ_WORK) -> 'TargetHandler':
+    #     """
+    #     Factory method to return appropriate TargetHandler based on `target` input.
+    #     """
+    #     if isinstance(target, TargetHandler):
+    #         return target
+    #     elif isinstance(target, pd.Timedelta):
+    #         return TimeDeltaTargetHandler(target, timezone=timezone)
+    #     elif isinstance(target, str):
+    #         lower = target.lower()
+    #         if lower in ['eod', 'eod_rth']:
+    #             return EODTargetHandler(rth_only=(lower == 'eod_rth'), timezone=timezone)
+    #         elif 'vwap' in lower:
+    #             timeframe = helpers.extract_timeframe_from_df_column(lower)
+    #             return VWAPCrossTargetHandler(timeframe=timeframe, max_time='eod_rth', timezone=timezone)
+    #         else:
+    #             # Try parsing string like "5 min", "1h", etc.
+    #             try:
+    #                 parsed_delta = pd.to_timedelta(target)
+    #                 return TimeDeltaTargetHandler(parsed_delta)
+    #             except ValueError:
+    #                 raise ValueError(f"Unsupported target type: {target}")
+    #     else:
+    #         raise ValueError(f"Unsupported target type: {target}")
 
 
 class TimeDeltaTargetHandler(TargetHandler):
     def __init__(self, delta:pd.Timedelta, timezone=CONSTANTS.TZ_WORK):
-        self.delta = delta
-        self.timezone = timezone
-        self.entry_time = None
-        self.target_str = str(self.delta.total_seconds() / 60) + 'min'
-        self.required_columns = []
+        super().__init__(max_time=delta, timezone=timezone)
+        self.target_str = str(self.max_time.total_seconds() / 60) + 'min'
 
     def get_target_time(self, df:pd.DataFrame, trigger_time:pd.Timestamp) -> pd.Timestamp:
-        return resolve_max_time(trigger_time, self.delta, self.timezone)
+        return resolve_max_time(trigger_time, self.max_time, self.timezone)
     
     def get_target_event(self, prev_row:pd.Series, curr_row:pd.Series, entry_time:pd.Timestamp=None) -> Optional[str]:
         entry_time = entry_time or self.entry_time
         if entry_time is None:
             return None
 
-        end_time = resolve_max_time(self.entry_time, entry_time + self.delta, timezone=self.timezone)
+        end_time = resolve_max_time(entry_time, self.max_time, timezone=self.timezone)
         if curr_row['date'] >= end_time:
             return 'timedelta_exit'
         return None
@@ -114,59 +127,206 @@ class TimeDeltaTargetHandler(TargetHandler):
 
 class EODTargetHandler(TargetHandler):
     def __init__(self, rth_only:bool=False, timezone=CONSTANTS.TZ_WORK):
-        self.end_time = 'eod_rth' if rth_only else 'eod'
-        self.timezone = timezone
-        self.entry_time = None
+        super().__init__(timezone=timezone)
+        self.max_time = 'eod_rth' if rth_only else 'eod'
         self.target_str = 'eodt'
-        self.required_columns = []
 
     def get_target_time(self, df:pd.DataFrame, trigger_time:pd.Timestamp) -> pd.Timestamp:
-        return resolve_max_time(trigger_time, self.end_time, self.timezone)
-
-    def set_entry_time(self, time:pd.Timestamp):
-        self.entry_time = time
+        return resolve_max_time(trigger_time, self.max_time, self.timezone)
 
     def get_target_event(self, prev_row:pd.Series, curr_row:pd.Series, entry_time:pd.Timestamp=None) -> Optional[str]:
         entry_time = entry_time or self.entry_time
         if entry_time is None:
             return None
 
-        eod_time = resolve_max_time(self.entry_time, self.end_time, timezone=self.timezone)
+        eod_time = resolve_max_time(entry_time, self.max_time, timezone=self.timezone)
         if curr_row['date'] >= eod_time:
             return 'eod_exit'
         return None
 
 
 class FixedTargetHandler(TargetHandler):
-    def __init__(self, target_price:float, max_time:timedelta=None, timezone=CONSTANTS.TZ_WORK):
-        self.target_price = target_price
-        self.max_time = max_time
-        self.timezone = timezone
+    def __init__(self, direction:str, max_time:timedelta=None, timezone=CONSTANTS.TZ_WORK):
+        super().__init__(max_time=max_time, timezone=timezone)
+        self.direction = direction
+        self.dir = {'bull': 'up', 'bear': 'down'}[self.direction]
+        self.dir_int = {'bull': 1, 'bear': -1}[self.direction]
+        self.target_price = None
         self.target_str = 'fixed'
-        self.required_columns = []
-
+    
+    def set_target_price(self, row:pd.Series):
+        self.target_price = row['close'] # Placeholder for now
+    
     def get_target_time(self,  df:pd.DataFrame, trigger_time:pd.Timestamp) -> pd.Timestamp:
-        return resolve_max_time(trigger_time, self.max_time, self.timezone)
+        # Ensure trigger_time exists in the dataframe index
+        if trigger_time not in df.index:
+            raise ValueError(f"trigger_time {trigger_time} not found in dataframe index")
+
+        # Resolve the max target time based on the given max_time and timezone
+        max_target_time = resolve_max_time(trigger_time, self.max_time, timezone=self.timezone)
+
+        # Slice the dataframe from the trigger time onward
+        post_df = df.loc[trigger_time:]
+        if max_target_time:
+            post_df = post_df[post_df.index <= max_target_time]
+
+        if post_df.empty:
+            return trigger_time  # Return trigger_time if no data after it
+
+        # if not self.target_price:
+        self.set_target_price(df.loc[trigger_time])
+
+        # trig_close = df.at[trigger_time, 'close']
+        # direction = np.sign(trig_close - self.target_price)
+        direction = -self.dir_int
+        
+        sign_diff = (post_df['close'] - self.target_price).apply(np.sign).diff()
+        cross_rows = post_df[sign_diff == -2 * direction]
+
+        if not cross_rows.empty:
+            return cross_rows.index[0]
+        else:
+            return post_df.index[-1]
     
     def get_target_event(self, prev_row:pd.Series, curr_row:pd.Series, entry_time:pd.Timestamp=None) -> Optional[str]:
-        pass
+        entry_time = entry_time or self.entry_time
+        if prev_row is None or not self.target_price or entry_time is None:
+            return None
 
+        max_target_time = resolve_max_time(entry_time, self.max_time, timezone=self.timezone)
+
+        if not self.target_price:
+            self.set_target_price(curr_row)
+
+        prev_diff = prev_row['close'] - self.target_price
+        curr_diff = curr_row['close'] - self.target_price
+
+        if curr_row['date'] > max_target_time:
+            return 'max_time_overshoot'
+        if np.sign(prev_diff) != np.sign(curr_diff):
+            return f'{self.target_str}_cross_exit'
+        return None
+
+class PercGainTargetHandler(FixedTargetHandler):
+    def __init__(self, perc_gain:int, direction:str, max_time:timedelta=None, timezone=CONSTANTS.TZ_WORK):
+        super().__init__(direction=direction, max_time=max_time, timezone=timezone)
+        self.perc_gain = perc_gain
+        self.target_price = None
+        self.target_str = f'perc_gain_{perc_gain}%'
+
+    def set_target_price(self, row:pd.Series):
+        self.target_price = row['close'] * (1 + (self.perc_gain / 100))
+
+
+class NextLevelTargetHandler(FixedTargetHandler):
+    def __init__(self, level_types:str, timeframe:Timeframe, direction:str, max_time:timedelta=None, timezone=CONSTANTS.TZ_WORK):
+        super().__init__(direction=direction, max_time=max_time, timezone=timezone)
+        self.level_types = level_types or resolve_level_types(timeframe)
+        self.target_str = f'next_level_{self.dir}'
+        self.required_columns = self._generate_required_columns()
+        self.next_level = None
+    
+    def _generate_required_columns(self):
+        cols = []
+        for level in self.level_types:
+            cols.append(f"{level}_dist_to_next_{self.dir}")
+            # cols.append(f"{level}_dist_to_next_{self.dir}_pct") # Include both raw and pct versions for flexibility
+        return cols
+
+    @staticmethod
+    def _get_next_round_price_level(current_price:float) -> float:
+        """
+        Calculate the next psychological level above the current price.
+        Automatically adjusts the rounding increment based on the current price range.
+        """
+        if current_price < 10: increment = 1  # For prices below 10, we round to the nearest 1.
+        elif current_price < 100: increment = 5  # For prices between 10 and 100, we round to the nearest 5.
+        elif current_price < 1000: increment = 10  # For prices between 100 and 1000, we round to the nearest 10.
+        elif current_price < 10000: increment = 50  # For prices between 1000 and 10000, we round to the nearest 50.
+        else: increment = 100  # For prices above 10000, we round to the nearest 100 (or use larger increments).
+
+        # Round up to the next psychological level using the determined increment
+        psychological_level = (current_price // increment + 1) * increment
+        return psychological_level
+
+    def set_target_price(self, row:pd.Series):
+        dist_next_levels = [{'value': row[f"{level}_dist_to_next_{self.dir}"], 'level': level} for level in self.level_types]
+        dist_next_level = min(dist_next_levels, key=lambda x: x['value'])
+
+        if pd.isna(dist_next_level['value']):
+            # If all distance values are NaN, calculate the next psychological level
+            self.target_price = self._get_next_round_price_level(row['close'])
+        else:
+            self.target_price = row['close'] + self.dir_int * dist_next_level['value']
+            self.next_level = dist_next_level['level']
+    
+    # def get_target_time(self, df:pd.DataFrame, trigger_time:pd.Timestamp) -> pd.Timestamp:
+    #     # Ensure all required columns are present in the dataframe
+    #     if not set(self.required_columns).issubset(df.columns):
+    #         raise ValueError(f"Required columns {self.required_columns} not found in dataframe")
+
+    #     # Ensure trigger_time exists in the dataframe index
+    #     if trigger_time not in df.index:
+    #         raise ValueError(f"trigger_time {trigger_time} not found in dataframe index")
+
+    #     # Resolve the max target time based on the given max_time and timezone
+    #     max_target_time = resolve_max_time(trigger_time, self.max_time, timezone=self.timezone)
+
+    #     # Slice the dataframe from the trigger time onward
+    #     post_df = df.loc[trigger_time:]
+    #     if max_target_time:
+    #         post_df = post_df[post_df.index <= max_target_time]
+
+    #     if post_df.empty:
+    #         return trigger_time  # Return trigger_time if no data after it
+
+    #     if not self.target_price:
+    #         self.set_target_price(df.loc[trigger_time])
+
+    #     # trig_close = df.at[trigger_time, 'close']
+    #     # direction = np.sign(trig_close - self.target_price)
+    #     direction = -self.dir_int
+        
+    #     sign_diff = (post_df['close'] - self.target_price).apply(np.sign).diff()
+    #     cross_rows = post_df[sign_diff == -2 * direction]
+
+    #     if not cross_rows.empty:
+    #         return cross_rows.index[0]
+    #     else:
+    #         return post_df.index[-1]
+        
+    # def get_target_event(self, prev_row:pd.Series, curr_row:pd.Series, entry_time:pd.Timestamp=None) -> Optional[str]:
+    #     entry_time = entry_time or self.entry_time
+    #     if prev_row is None or entry_time is None:
+    #         return None
+
+    #     max_target_time = resolve_max_time(entry_time, self.max_time, timezone=self.timezone)
+
+    #     if not self.target_price:
+    #         self.set_target_price(curr_row)
+        
+    #     prev_diff = prev_row['close'] - self.target_price
+    #     curr_diff = curr_row['close'] - self.target_price
+
+    #     if max_target_time and curr_row['date'] > max_target_time:
+    #         return 'max_time_overshoot'
+    #     if np.sign(prev_diff) != np.sign(curr_diff) and curr_diff * self.dir_int > 0:
+    #         return f'{self.target_str}_cross_exit'
+    #     return None
+    
 
 class VWAPCrossTargetHandler(TargetHandler):
-    def __init__(self, timeframe:Timeframe, max_time:timedelta=None, timezone=CONSTANTS.TZ_WORK):
-        self.max_time = max_time
-        self.timezone = timezone
-        self.entry_time = None
+    def __init__(self, timeframe:Timeframe, direction:str, max_time:timedelta=None, timezone=CONSTANTS.TZ_WORK):
+        super().__init__(max_time=max_time, timezone=timezone)
         self.timeframe = timeframe or Timeframe()
         self.target_str = f'vwap_{self.timeframe}'
         self.required_columns = [self.target_str]
-
-    def set_entry_time(self, time:pd.Timestamp):
-        self.entry_time = time
-
+        self.dir_int = {'bull': 1, 'bear': -1}[direction]
+        
     def get_target_time(self, df:pd.DataFrame, trigger_time:pd.Timestamp) -> pd.Timestamp:
-        if f'vwap_{self.timeframe}' not in df.columns:
-            raise ValueError(f"{self.target_str} column not found in dataframe")
+        # Ensure all required columns are present in the dataframe
+        if not set(self.required_columns).issubset(df.columns):
+            raise ValueError(f"Required columns {self.required_columns} not found in dataframe")
 
         if trigger_time not in df.index:
             raise ValueError(f"trigger_time {trigger_time} not found in dataframe index")
@@ -194,18 +354,19 @@ class VWAPCrossTargetHandler(TargetHandler):
         else:
             return post_df.index[-1]
 
-    def get_target_event(self, prev_row:pd.Series, curr_row:pd.Series) -> Optional[str]:
-        if self.target_str not in curr_row or prev_row is None or self.target_str not in prev_row:
+    def get_target_event(self, prev_row:pd.Series, curr_row:pd.Series, entry_time:pd.Timestamp=None) -> Optional[str]:
+        entry_time = entry_time or self.entry_time
+        if self.target_str not in curr_row or prev_row is None or self.target_str not in prev_row or entry_time is None:
             return None
 
-        max_target_time = resolve_max_time(self.entry_time, self.max_time, timezone=self.timezone)
+        max_target_time = resolve_max_time(entry_time, self.max_time, timezone=self.timezone)
 
         prev_diff = prev_row['close'] - prev_row[self.target_str]
         curr_diff = curr_row['close'] - curr_row[self.target_str]
 
         if curr_row['date'] > max_target_time:
             return 'max_time_overshoot'
-        if np.sign(prev_diff) != np.sign(curr_diff):
+        if np.sign(prev_diff) != np.sign(curr_diff) and curr_diff * self.dir_int < 0:
             return f'{self.target_str}_cross_exit'
         return None
 
@@ -248,12 +409,13 @@ class FixedStopLossHandler(StopLossHandler):
 
 
 class NextLevelStopLossHandler(StopLossHandler):
-    def __init__(self, level_types:list[str]=None, offset:float=0.05):
+    # def __init__(self, level_types:list[str]=None, offset:float=0.05):
+    def __init__(self, timeframe:Timeframe, offset:float=0.05):
         """
         :param level_types: List of level types to use (e.g., 'sr_1D', 'pivots', etc.)
         :param offset: Percentage offset beyond the level for the stop-loss (e.g., 0.05 = 5%)
         """
-        self.level_types = level_types or ['sr_1h', 'sr_1D', 'sr_1W', 'pivots', 'pivots_D', 'pivots_M', 'levels', 'levels_M']
+        self.level_types = resolve_level_types(timeframe)#level_types or ['sr_1h', 'sr_1D', 'sr_1W', 'pivots', 'pivots_D', 'pivots_M', 'levels', 'levels_M']
         self.offset = offset
         self.required_columns = self._generate_required_columns()
         self.stop_type = 'level'

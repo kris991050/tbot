@@ -147,7 +147,6 @@ class StrategyAnalyzer:
         sortino_ratio_bar = mean_return / (downside_std + epsilon)
         sortino_ratio_yearly = sortino_ratio_bar * np.sqrt(TRADING_MINUTES_PER_YEAR / (event_duration + epsilon))
 
-
         time_to_max_ratio = time_to_max / (event_duration + epsilon)
         time_to_min_ratio = time_to_min / (event_duration + epsilon)
         drawdown_duration_ratio = drawdown_duration / (event_duration + epsilon)
@@ -213,7 +212,6 @@ class StrategyAnalyzer:
 
     def analyze_post_trigger(self, df, trigger_column, target_handler, side):
         # target can now be a string (e.g. 'eod', 'vwap_cross') or timedelta, or a TargetHandler instance
-        # target_handler = TargetHandler.from_target(target)
 
         results = []
         triggered_times = df.index[df[trigger_column]].tolist()
@@ -256,7 +254,6 @@ class StrategyAnalyzer:
 
         return pd.DataFrame(results)#.dropna()
 
-
     def pre_analyze(self, df, targets):
         # targets is either timedelta ('5 min') either 'eod_rth', either 'eod'
 
@@ -272,7 +269,8 @@ class StrategyAnalyzer:
         df_results_list = []
         for col in self.trigger_columns:
             side = side_map(col)
-            for target_handler in targets:
+            for i, target_handler in enumerate(targets):
+                print(f"⚙️ Analyzing with target {i+1} out of {len(targets)}")
 
                 if timeframe.pandas in ['1D', '1W', '1M'] and isinstance(target_handler, EODTargetHandler):
                     print("Cannot use 'eod' or 'eod_rth' with daily or higher timeframes.")

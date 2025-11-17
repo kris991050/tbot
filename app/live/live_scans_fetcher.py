@@ -10,12 +10,9 @@ from utils import helpers, constants
 
 class LiveScansFetcher(live_loop_base.LiveLoopBase):
 
-    def _is_between_market_times(self, start_label, end_label):
-        now = pd.Timestamp.now(tz=self.config.timezone).time()
-        return constants.CONSTANTS.TH_TIMES[start_label] < now < constants.CONSTANTS.TH_TIMES[end_label]
-
     def _scan_gappers(self):
-        if not helpers.is_between_market_times('pre-market', 'rth', self.config.timezone):
+        now = helpers.calculate_now(sim_offset=self.config.sim_offset, tz=self.config.timezone)
+        if not helpers.is_between_market_times('pre-market', 'rth', now=now, timezone=self.config.timezone):
             return
         print('\n======== FETCHING GAPPERS UP ========\n')
         symbols_up, df_up = scanner.scannerTradingView("GapperUp")
@@ -28,7 +25,8 @@ class LiveScansFetcher(live_loop_base.LiveLoopBase):
         helpers.save_to_daily_csv(self.ib, symbols_down, constants.PATHS.daily_csv_files['gapper_down'])
 
     def _scan_earnings(self):
-        if not helpers.is_between_market_times('pre-market', 'rth', self.config.timezone):
+        now = helpers.calculate_now(sim_offset=self.config.sim_offset, tz=self.config.timezone)
+        if not helpers.is_between_market_times('pre-market', 'rth', now=now, timezone=self.config.timezone):
             return
         print('\n======== FETCHING RECENT EARNINGS ========\n')
         symbols, _ = scanner.scannerFinviz("RE")
@@ -54,7 +52,7 @@ if __name__ == "__main__":
     continuous = not 'snapshot' in args
     wait_seconds = next((int(float(arg[5:])) for arg in args if arg.startswith('wait=')), 3*60)
 
-    fetcher = LiveScansFetcher(wait_seconds=wait_seconds, continuous=continuous, paper_trading=paper_trading, remote_ib=not local_ib)
+    fetcher = LiveScansFetcher(worker_type='scans_fetcher', wait_seconds=wait_seconds, continuous=continuous, paper_trading=paper_trading, remote_ib=not local_ib)
     fetcher.run()
 
 

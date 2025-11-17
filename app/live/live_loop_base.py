@@ -3,15 +3,16 @@ from ib_insync import *
 parent_folder = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_folder)
 
-from utils import helpers
+from utils import helpers, logs
 from utils.constants import CONSTANTS
 from execution import trade_manager
 import trading_config, live_data_logger
 
 
 class LiveLoopBase:
-    def __init__(self, wait_seconds:int=None, continuous:bool=True, single_symbol:str=None, ib_disconnect:bool=False, live_mode:str='live', config=None, 
+    def __init__(self, worker_type:str='', wait_seconds:int=None, continuous:bool=True, single_symbol:str=None, ib_disconnect:bool=False, live_mode:str='live', config=None, 
                  paper_trading:bool=None, remote_ib:bool=None, timezone=None):
+        self.worker_type = worker_type
         self.live_mode = helpers.set_var_with_constraints(live_mode, CONSTANTS.MODES['live'])
         self.config = self._resolve_config(config)
         self.wait_seconds = wait_seconds if wait_seconds else None
@@ -22,7 +23,8 @@ class LiveLoopBase:
         self.ib_disconnect = ib_disconnect
         self.daily_data_folder = helpers.get_path_daily_data_folder()
         self.manager = trade_manager.TradeManager(self.ib, config=self.config)
-        self.logger = live_data_logger.LiveDataLogger(config=self.config)
+        self.logger = live_data_logger.LiveDataLogger(worker_type=self.worker_type, config=self.config)
+        self.original_stdout = sys.stdout  # Save the original stdout reference, before redirecting stdout to logging class LogContext
 
     def _resolve_config(self, config):
         if isinstance(config, trading_config.TradingConfig):
@@ -44,7 +46,7 @@ class LiveLoopBase:
             self.ib.disconnect()
 
     def _sleep_wait(self):
-        if sys.stdout.isatty():
+        if hasattr(self.original_stdout, 'isatty') and self.original_stdout.isatty():
             helpers.sleep_display(self.wait_seconds, self.ib)
         else:
             print("⌛ Waiting ", self.wait_seconds, " sec...")
@@ -62,15 +64,20 @@ class LiveLoopBase:
         # start_time = pd.Timestamp.combine(current_time.date(), CONSTANTS.TH_TIMES['pre-market']).tz_localize(CONSTANTS.TZ_WORK)
         # end_time = pd.Timestamp.combine(current_time.date(), CONSTANTS.TH_TIMES['end_of_day']).tz_localize(CONSTANTS.TZ_WORK)
 
-        # while start_time <= current_time < end_time:
-        while helpers.is_between_market_times('pre-market', 'end_of_day', self.config.timezone):
-            self._connect_ib()
+        # Create live log file path
+        with logs.LogContext(self.logger.live_log_file_path, overwrite=True): # Logging starts here
 
-            self._execute_main_task() # Call the subclass-specific method
+            # while start_time <= current_time < end_time:
+            now = helpers.calculate_now(sim_offset=self.config.sim_offset, tz=self.config.timezone)
+            while helpers.is_between_market_times('pre-market', 'end_of_day', now=now, timezone=self.config.timezone):
 
-            if self.continuous:
-                if self.ib_disconnect: self._disconnect_ib()
-                self._sleep_wait()
-            else:
-                break
-            print(f"\n⌛ Countdown completed")
+                self._connect_ib()
+
+                self._execute_main_task() # Call the subclass-specific method
+
+                if self.continuous:
+                    if self.ib_disconnect: self._disconnect_ib()
+                    self._sleep_wait()
+                else:
+                    break
+                print(f"\n⌛ Countdown completed")

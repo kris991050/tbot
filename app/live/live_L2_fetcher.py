@@ -71,7 +71,7 @@ if __name__ == "__main__":
     single_symbol = next(([arg[7:]] for arg in args if arg.startswith('symbol=')), None)
     wait_seconds = next((int(float(arg[5:])) for arg in args if arg.startswith('wait=')), 5*60)
 
-    fetcher = LiveL2Fetcher(wait_seconds=wait_seconds, continuous=continuous, single_symbol=single_symbol, ib_disconnect=True, 
+    fetcher = LiveL2Fetcher(worker_type='L2_fetcher', wait_seconds=wait_seconds, continuous=continuous, single_symbol=single_symbol, ib_disconnect=True, 
                             paper_trading=paper_trading, remote_ib=not local_ib)
     fetcher.run()
 

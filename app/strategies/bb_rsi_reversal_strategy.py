@@ -24,7 +24,7 @@ class BBRSIReversalStrategy(base_strategy.BaseStrategy):
         self.cam_M_threshold = cam_M_threshold
         self.revised = revised
         rev = '' if not revised else '_R' if revised else None
-        self.trigger_columns = [self.name.lower()]
+        self.trigger_columns = [self.name]
         self.name += rev
         self.trigger_columns = [c + rev for c in self.trigger_columns]
         self.params = {
@@ -38,7 +38,7 @@ class BBRSIReversalStrategy(base_strategy.BaseStrategy):
             # 'trigger_features': {'indicators': ['momentum', 'volatility'], 'levels': True, 'patterns': False, 'sr': False},
             # 'trigger_timeframes': self.timeframes#]['2min', '5min', '15min', '1h'] if timeframe_min == 1 else ['5min', '15min', '1h', '4h'] if timeframe_min == 2 else ['1min', '5min', '15min', '1h'] if timeframe_min == 5 else []
         }
-        self.target_handler = target_handler.VWAPCrossTargetHandler(self.timeframe, max_time='eod')
+        self.target_handler = target_handler.VWAPCrossTargetHandler(self.timeframe, self.direction, max_time='eod')
         self.stop_handler = None
         self.required_columns = self._build_required_columns()
         self.required_features = {'indicators': ['momentum', 'volatility'], 'levels': ['monthly'], 'patterns': [], 'sr': False}

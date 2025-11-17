@@ -120,11 +120,14 @@ class CustomBacktestEngine:
                     entry_idx = i
                     entry_price = curr_row['close']
                     self.entry_exec_price = entry_price * (1 + self.manager.direction * self.slippage_pct)
+                    decision_prediction = decision_row['model_prediction']
                     entry_prediction = curr_row['model_prediction']
                     quantity = self.manager.evaluate_quantity(entry_prediction)
 
                     if hasattr(self.manager.strategy_instance.target_handler, 'set_entry_time'):
                         self.manager.strategy_instance.target_handler.set_entry_time(curr_row['date'])
+                    if hasattr(self.manager.strategy_instance.target_handler, 'set_target_price'):
+                        self.manager.strategy_instance.target_handler.set_target_price(row=decision_row)
 
                     # Resolve stop once here
                     self.active_stop_price = self.manager.resolve_stop_price(curr_row, self.active_stop_price)
@@ -141,8 +144,8 @@ class CustomBacktestEngine:
                     exit_price = curr_row['close']
                     self.exit_exec_price = exit_price * (1 - self.manager.direction * self.slippage_pct)
                     trade_evaluator.TradeEvaluator.log_trade(self.manager.direction, self.trades, entry_idx, exit_idx, self.df, entry_price, exit_price, quantity, 
-                                             entry_prediction, self.active_stop_price, reason2close, self.symbol, self.entry_exec_price, 
-                                             self.exit_exec_price, self.entry_commission, self.exit_commission)
+                                             decision_prediction, entry_prediction, self.active_stop_price, reason2close, self.symbol, 
+                                             self.entry_exec_price, self.exit_exec_price, self.entry_commission, self.exit_commission)
                     in_position = False
                     self.active_stop_price = None  # Reset for next trade
 

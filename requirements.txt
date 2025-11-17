@@ -24,3 +24,10 @@ nltk
 finvizfinance
 tzlocal
 matplotlib
+ta
+scipy
+hdbscan
+plotly
+numba
+xgboost
+shap

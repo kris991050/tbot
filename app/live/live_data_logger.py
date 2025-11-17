@@ -9,7 +9,8 @@ import trading_config
 
 
 class LiveDataLogger:
-    def __init__(self, config=None, live_mode=None, sim_offset=None, timezone=None):
+    def __init__(self, worker_type:str='', config=None, live_mode=None, sim_offset=None, timezone=None):
+        self.worker_type = worker_type
         self.config = config or trading_config.TradingConfig().set_config(locals())
         # self.mode = mode
         # self.sim_offset = sim_offset if self.config.mode == 'sim' else datetime.timedelta(0) if self.config.mode == 'live' else None
@@ -22,19 +23,23 @@ class LiveDataLogger:
         date_now = helpers.calculate_now(self.config.sim_offset, self.config.timezone)
         sim_str = '_sim' if self.config.live_mode == 'sim' else '' if self.config.live_mode == 'live' else None
         config_file_name = f"config_live_{date_now.strftime("%Y%m%d")}{sim_str}.json"
-        tickers_file_name = f"tickers_live_logs_{date_now.strftime("%Y%m%d")}{sim_str}.json"
-        fetch_queue_file_name = f"fetch_queue_live_logs_{date_now.strftime("%Y%m%d")}{sim_str}.json"
-        enrich_queue_file_name = f"enrich_queue_live_logs_{date_now.strftime("%Y%m%d")}{sim_str}.json"
-        execute_queue_file_name = f"execute_queue_live_logs_{date_now.strftime("%Y%m%d")}{sim_str}.json"
-        self.config_file_path = os.path.join(helpers.get_path_date_folder(date_now, create_if_none=True), config_file_name)
-        self.tickers_log_file_path = os.path.join(helpers.get_path_date_folder(date_now, create_if_none=True), tickers_file_name)
+        tickers_file_name = f"tickers_live_{date_now.strftime("%Y%m%d")}{sim_str}.json"
+        fetch_queue_file_name = f"fetch_queue_live_{date_now.strftime("%Y%m%d")}{sim_str}.json"
+        enrich_queue_file_name = f"enrich_queue_live_{date_now.strftime("%Y%m%d")}{sim_str}.json"
+        execute_queue_file_name = f"execute_queue_live_{date_now.strftime("%Y%m%d")}{sim_str}.json"
+        date_folder = helpers.get_path_date_folder(date_now, create_if_none=True)
+        logs_folder = helpers.get_path_daily_logs_folder(date_now, create_if_none=True)
+        self.config_file_path = os.path.join(date_folder, config_file_name)
+        self.tickers_log_file_path = os.path.join(date_folder, tickers_file_name)
         self.queue_paths = {
-            'fetch': os.path.join(helpers.get_path_date_folder(date_now, create_if_none=True), fetch_queue_file_name), 
-            'enrich': os.path.join(helpers.get_path_date_folder(date_now, create_if_none=True), enrich_queue_file_name), 
-            'execut': os.path.join(helpers.get_path_date_folder(date_now, create_if_none=True), execute_queue_file_name)
+            'fetch': os.path.join(date_folder, fetch_queue_file_name), 
+            'enrich': os.path.join(date_folder, enrich_queue_file_name), 
+            'execut': os.path.join(date_folder, execute_queue_file_name)
         }
-        trade_log_file_name = f"trade_log_{date_now.strftime("%Y%m%d")}{sim_str}.txt"
-        self.trade_log_file_path = os.path.join(helpers.get_path_date_folder(date_now, create_if_none=True), trade_log_file_name)
+        live_log_file_name = f"live_log_{self.worker_type}_{date_now.strftime("%Y-%m-%d_%H-%M-%S")}{sim_str}.txt"
+        self.live_log_file_path = os.path.join(logs_folder, live_log_file_name)
+        trade_log_file_name = f"trade_log_{date_now.strftime("%Y-%m-%d_%H-%M-%S")}{sim_str}.txt"
+        self.trade_log_file_path = os.path.join(logs_folder, trade_log_file_name)
         self.default_priority = 2
 
     def initialize_ticker(self):

@@ -171,7 +171,7 @@ class FeaturePreprocessor:
             'symbol', 'timeframe', 'strategy', 'target', 'data_to_time', 'data_from_time', 'low_of_day', 'high_of_day'
             'trig_time', 'date_D', 'date_M', 'time_to_max', 'time_to_max_ratio', 'time_to_min', 'time_to_min_ratio',
             'time_to_recovery', 'time_to_recovery_ratio', 'max_drawdown_per_min', 'open', 'low', 'high', 'trig_close',
-            'session',
+            'session', 'week#'
         ]
 
         # self.categorical_cols = ['market_cap_cat', 'session', 'first_event']
@@ -394,7 +394,10 @@ class FeaturePreprocessor:
 
         for col in numeric_X.columns:
             original = numeric_X[col].copy()
-            numeric_X[col] = numeric_X[col].clip(lower=lower[col], upper=upper[col])
+
+            # Temporarily convert column to float for clipping, in case column was not of float type
+            numeric_X[col] = numeric_X[col].astype(float).clip(lower=lower[col], upper=upper[col])
+
             clipped_low = (original < lower[col]).sum()
             clipped_high = (original > upper[col]).sum()
             clip_log[col] = {

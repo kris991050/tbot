@@ -56,13 +56,13 @@ class FeatureBuilder:
         tf_to_remove = []
         for tf in mtf:
             timeframe_mtf = Timeframe(tf)
-            if Timeframe(tf).to_seconds < self.timeframe.to_seconds:
+            if timeframe_mtf.to_seconds < self.timeframe.to_seconds:
                 print(f"Skipping timeframe {timeframe_mtf}, as < current timeframe {self.timeframe}")
                 tf_to_remove.append(tf)
                 continue
         mtf = [tf for tf in mtf.copy() if tf not in tf_to_remove]
         return mtf
-
+    
     def _get_warmup_df(self, df:pd.DataFrame, timeframe:Timeframe) -> pd.DataFrame:
         print(f"⛏️ Fetching warmup data for {self.symbol}")
         wfetcher = hist_market_data_handler.HistMarketDataFetcher(ib=self.ib, timeframe=timeframe, file_format=self.file_format,

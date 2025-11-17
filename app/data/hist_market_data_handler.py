@@ -390,7 +390,7 @@ class HistMarketDataCompleter:
 class HistMarketDataEnricher:
     def __init__(self, ib, timeframe:Timeframe=None, base_timeframe:Timeframe=None, look_backward:str=None, feature_types:list=['all'], mtf:list=None,
                  file_format:str=None, symbols=None, base_folder=None, delete_existing=True, save_to_file=True, keep_results:bool=True, 
-                 drop_levels:bool=False, block_add_sr=False, validate=True, timezone=None, separation_text:str=''):
+                 drop_levels:bool=False, block_add_sr=False, validate=True, timezone=None, separation_text:str='', override_existing:bool=False):
         self.ib = ib
         self.symbols = symbols or []
         self.delete_existing = delete_existing
@@ -410,6 +410,7 @@ class HistMarketDataEnricher:
                                                  base_folder=base_folder, timezone=timezone)
         self.look_backward = look_backward or CONSTANTS.WARMUP_MAP[self.handler.timeframe.pandas]
         self.separation_text = separation_text
+        self.override_existing = override_existing
 
     def _validate_dates_alignment(self, df_original, df_enriched, filename):
         """Ensure dates match exactly and no gaps are introduced."""
@@ -475,9 +476,12 @@ class HistMarketDataEnricher:
         df_existing_hist, existing_start_hist, existing_end_hist, _ = \
             helpers.check_existing_data_file(symbol, self.base_handler.timeframe, symbol_folder, data_type='hist_data', delete_file=False,
                                                  file_format=self.handler.file_format)
-        df_existing_enriched, existing_start_enriched, existing_end_enriched, path_existing_enriched = \
-            helpers.check_existing_data_file(symbol, self.handler.timeframe, symbol_folder, data_type='enriched_data', delete_file=False,
-                                                 file_format=self.handler.file_format)
+        if not self.override_existing:
+            df_existing_enriched, existing_start_enriched, existing_end_enriched, path_existing_enriched = \
+                helpers.check_existing_data_file(symbol, self.handler.timeframe, symbol_folder, data_type='enriched_data', delete_file=False,
+                                                    file_format=self.handler.file_format)
+        else:
+            df_existing_enriched, existing_start_enriched, existing_end_enriched, path_existing_enriched = pd.DataFrame(), None, None, None
 
         if not df_existing_enriched.empty and not df_existing_hist.empty and existing_end_enriched <= existing_end_hist \
             and existing_start_enriched > existing_end_hist:
@@ -735,6 +739,8 @@ if __name__ == "__main__":
     args = sys.argv
     action_list = ['fetch', 'complete', 'validate', 'load', 'enrich', 'convert']
     paperTrading = not 'live' in args
+    local_ib = 'local' in args
+    override = 'override' in args
     delete_file = not 'nodelete' in args
     keep_results = 'keep' in args
     fetcher_type = next((arg[13:] for arg in args if arg.startswith('fetcher_type=') and arg[13:] in CONSTANTS.FETCHER_TYPES), 'auto')
@@ -751,7 +757,7 @@ if __name__ == "__main__":
     symbols = [single_symbol] if single_symbol else []
 
     # TWS Connection
-    ib, ibConnection = helpers.IBKRConnect_any(IB(), paper=paperTrading)
+    ib, ibConnection = helpers.IBKRConnect_any(IB(), paper=paperTrading, remote=not local_ib)
     # ib=IB()
 
     if action == 'fetch':
@@ -773,7 +779,8 @@ if __name__ == "__main__":
         # symbols = ['QIPT','SPGI']
         separation_text = "*" * 75 + "\n\n"
         enricher = HistMarketDataEnricher(ib, timeframe=Timeframe(timeframe), mtf=mtf, file_format=file_format, symbols=symbols, 
-                                          keep_results=keep_results, delete_existing=delete_file, separation_text=separation_text)
+                                          keep_results=keep_results, delete_existing=delete_file, separation_text=separation_text, 
+                                          override_existing=override)
         results = enricher.run()
 
     elif action == 'convert':
