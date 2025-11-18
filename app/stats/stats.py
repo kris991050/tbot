@@ -80,12 +80,14 @@ if __name__ == "__main__":
     if 'bb_rsi_reversal' in strategy:
 
         mtf = None
+        entry_delays = [1]
         strategy_func = trade_manager.get_strategy_instance(strategy_name=strategy, revised=revised, rsi_threshold=75, cam_M_threshold=4)
-        config = [{'timeframe': strategy_func.timeframe, 'targets': [strategy_func.target_handler], 'mtf': mtf}]
+        config = [{'timeframe': strategy_func.timeframe, 'targets': [strategy_func.target_handler], 'entry_delays': entry_delays, 'mtf': mtf}]
     
     if 'sr_bounce' in strategy:
 
         mtf = None
+        entry_delays = [0, 1]
         strategy_func_list = []
         target_list = []
         for ttf in [1, 2.5, 5, 7.5, 10]:
@@ -95,7 +97,7 @@ if __name__ == "__main__":
             target_list.append(strategy_func.target_handler)
         # strategy_func = trade_manager.get_strategy_instance(strategy_name=strategy, revised=revised, cam_M_threshold=3, target_factor=5, max_time_factor=50)
         # config = [{'timeframe': strategy_func.timeframe, 'targets': [strategy_func.target_handler], 'mtf': mtf}]
-        config = [{'timeframe': strategy_func.timeframe, 'targets': target_list, 'mtf': mtf}]
+        config = [{'timeframe': strategy_func.timeframe, 'targets': target_list, 'entry_delays': entry_delays, 'mtf': mtf}]
 
     elif 'breakouts' in strategy:
 
@@ -156,9 +158,9 @@ if __name__ == "__main__":
             df_all_results = pd.concat(df_results_list, ignore_index=True)
 
             # Group by timeframe and strategy
-            grouped = df_all_results.groupby(['timeframe', 'strategy', 'target'])
+            grouped = df_all_results.groupby(['timeframe', 'strategy', 'target', 'entry_delay'])
             df_results_list_grouped = []
-            for (timeframe, strategy_name, target), df_group in grouped:
+            for (timeframe, strategy_name, target, entry_delay), df_group in grouped:
                 # Reorder data per trigger time
                 df_group_sorted = df_group.sort_values("trig_time").reset_index(drop=True)
 
@@ -166,7 +168,7 @@ if __name__ == "__main__":
 
                 # Save to file
                 # filename = f"results_{strategy_name}_{timeframe.replace('/', '_')}_{target.replace('/', '_')}.csv"
-                filename = f"results_{strategy_name}_{target.replace('/', '_')}.csv"
+                filename = f"results_{strategy_name}_{target.replace('/', '_')}_delay{entry_delay}.csv"
                 filepath = os.path.join(strategy_folder, filename)
                 os.makedirs(strategies_folder, exist_ok=True)
                 helpers.save_df_to_file(df_group_sorted, str(filepath), file_format='csv')

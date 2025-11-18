@@ -21,14 +21,16 @@ class ModelTrainer:
     # model types: 'xgboost', 'rf', 'linear'
     # selector types: 'rf', 'rfe', 'rfecv'
     def __init__(self, model_type:str='xgboost', selector_type:str='rf', label_column:str='label_binary', strategy_name:str='',
-                 target:str='', base_models:str=None, base_folder:str=None, top_n_features:int=10, train_size:float=0.7, validation_size:float=0.15,
-                 depth_surrogate:int=3, clip_outliers:bool=True, show_figures:bool=False, shap_types:list=None, drawdown:bool=False, **preprocessor_kwargs):
+                 target:str='', entry_delay:int=1, base_models:str=None, base_folder:str=None, top_n_features:int=10, train_size:float=0.7, 
+                 validation_size:float=0.15, depth_surrogate:int=3, clip_outliers:bool=True, show_figures:bool=False, shap_types:list=None, 
+                 drawdown:bool=False, **preprocessor_kwargs):
 
         self.model_type = model_type
         self.base_models = base_models or ['rf', 'xgboost', 'linear']
         self.strategy_name = strategy_name
         self.timeframe_str = trade_manager.get_strategy_instance(self.strategy_name).timeframe.pandas
         self.target = target
+        self.entry_delay = entry_delay
         self.label_column = label_column
         self.top_n_features = top_n_features
         self.train_size = train_size
@@ -77,18 +79,19 @@ class ModelTrainer:
     def create_paths(self):
         d = 'dd_' if self.drawdown_mode else ''
         self.paths = {}
-        self.paths['data'] = os.path.join(self.base_folder, f"{d}results_{self.strategy_name}_{self.target}.csv")
+        filename_pattern = f"{self.strategy_name}_{self.target}_delay{self.entry_delay}"
+        self.paths['data'] = os.path.join(self.base_folder, f"{d}results_{filename_pattern}.csv")
         # rev = '' if not self.revised else '_revised'
         if self.figures_folder:
-            self.paths['confusion_matrix'] = os.path.join(self.figures_folder, f"{d}confusion_matrix_{self.strategy_name}_{self.target}.png")
-            self.paths['dependence_plot'] = os.path.join(self.figures_folder, f"{d}dependence_{self.strategy_name}_{self.target}.png")
-            self.paths['surrogate_tree'] = os.path.join(self.figures_folder, f"{d}surrogate_tree_{self.strategy_name}_{self.target}.png")
+            self.paths['confusion_matrix'] = os.path.join(self.figures_folder, f"{d}confusion_matrix_{filename_pattern}.png")
+            self.paths['dependence_plot'] = os.path.join(self.figures_folder, f"{d}dependence_{filename_pattern}.png")
+            self.paths['surrogate_tree'] = os.path.join(self.figures_folder, f"{d}surrogate_tree_{filename_pattern}.png")
             for shap_type in self.shap_types:
-                self.paths['shap_' + shap_type] = os.path.join(self.figures_folder, f"{d}shap_{shap_type}_{self.strategy_name}_{self.target}.png")
+                self.paths['shap_' + shap_type] = os.path.join(self.figures_folder, f"{d}shap_{shap_type}_{filename_pattern}.png")
 
-        if self.models_folder: self.paths['models'] = os.path.join(self.models_folder,f"{d}model_{self.strategy_name}_{self.target}.pkl")
-        if self.shaps_folder: self.paths['shaps'] = os.path.join(self.shaps_folder, f"{d}shap_{self.strategy_name}_{self.target}.pkl")
-        # if self.test_set_folder: self.paths['test_set'] = os.path.join(self.test_set_folder, f"test_set_{self.strategy_name}_{self.target}.csv")
+        if self.models_folder: self.paths['models'] = os.path.join(self.models_folder,f"{d}model_{filename_pattern}.pkl")
+        if self.shaps_folder: self.paths['shaps'] = os.path.join(self.shaps_folder, f"{d}shap_{filename_pattern}.pkl")
+        # if self.test_set_folder: self.paths['test_set'] = os.path.join(self.test_set_folder, f"test_set_{filename_pattern}.csv")
 
     def _check_model_type_subtype_compatibility(self):
         if self.model_subtype in ['classification', 'multi'] and self.model_type == 'linear':
@@ -332,7 +335,8 @@ class ModelTrainer:
         results = {
             "strategy": self.strategy_name,
             "timeframe": self.timeframe_str,
-            "target": self.target,
+            "target": self.target, 
+            "entry_delay": self.entry_delay
         }
 
         # Automatically determine metrics based on task type
@@ -409,7 +413,7 @@ class ModelTrainer:
         # SHAP and surrogate tree analysis
         if not self.model_type == 'stacking':
             self.shap_values, X_sample = self.explainer.compute_shap()
-            self.explainer.plot_shaps(self.strategy_name, self.timeframe_str, self.target, X_sample)
+            self.explainer.plot_shaps(self.strategy_name, self.timeframe_str, self.target, self.entry_delay, X_sample)
         self.surrogate_tree = self.explainer.train_surrogate_tree()
 
         print("=" * 40 + "\n✅ Training complete.\n")
@@ -427,7 +431,7 @@ class ModelTrainer:
         y_pred = self.model.predict(X[self.feature_names])
         cm = confusion_matrix(y, y_pred)
 
-        title = title + f" startegy {self.strategy_name}, timeframe {self.timeframe_str}, target {self.target}"
+        title = title + f" startegy {self.strategy_name}, timeframe {self.timeframe_str}, target {self.target}, delay {self.entry_delay}"
         disp = ConfusionMatrixDisplay(confusion_matrix=cm)
         disp.plot(cmap='Blues')
         plt.title(title)
@@ -466,6 +470,7 @@ class ModelTrainer:
                 'strategy': self.strategy_name,
                 'timeframe': self.timeframe_str,
                 'target': self.target,
+                'entry_delay': self.entry_delay, 
                 'label_column': self.label_column,
                 'data_ranges': {'training': [df_train['trig_time'].iloc[0], df_train['trig_time'].iloc[-1]],
                                 'validation': [df_val['trig_time'].iloc[0], df_val['trig_time'].iloc[-1]],
@@ -503,6 +508,7 @@ class ModelTrainer:
             self.strategy_name = data['strategy']
             self.timeframe_str = data['timeframe']
             self.target = data['target']
+            self.entry_delay = data['entry_delay']
             self.label_column = data['label_column']
             self.data_ranges = data['data_ranges']
             self.preprocessor.transform_features = data.get('transform_features', True)
@@ -514,16 +520,18 @@ class ModelTrainer:
 
 class StrategyModelComparator:
     def __init__(self, strategy_name:str, clip_outliers:bool=True, base_folder:str=None, model_type:str='xgboost', selector_type:str='rf', 
-                 label_column:str='label_binary', depth_surrogate:int=3):
+                 label_column:str='label_binary', depth_surrogate:int=3, dd_mode:bool=False):
         self.strategy_name = strategy_name
         self.clip_outliers=clip_outliers
+        model_type = model_type if not dd_mode else 'xgboost'
+        label_column = label_column if not dd_mode else 'max_drawdown_pct'
         self.trainer = ModelTrainer(model_type=model_type, selector_type=selector_type, label_column=label_column,
                                strategy_name=strategy_name, target='', clip_outliers=clip_outliers, base_folder=base_folder,
                                depth_surrogate=depth_surrogate, show_clipping_report=False, show_figures=False, plot_trim_distributions=False)
-        self.trainer_dd = ModelTrainer(model_type='xgboost', selector_type=selector_type, label_column='max_drawdown_pct',
-                               strategy_name=strategy_name, target='', clip_outliers=clip_outliers, base_folder=base_folder,
-                               depth_surrogate=depth_surrogate, show_clipping_report=False, show_figures=False, drawdown=True,
-                               plot_trim_distributions=False)
+        # self.trainer_dd = ModelTrainer(model_type='xgboost', selector_type=selector_type, label_column='max_drawdown_pct',
+        #                        strategy_name=strategy_name, target='', clip_outliers=clip_outliers, base_folder=base_folder,
+        #                        depth_surrogate=depth_surrogate, show_clipping_report=False, show_figures=False, drawdown=True,
+        #                        plot_trim_distributions=False)
 
         # self.base_folder = base_folder or os.path.join(PATHS.folders_path['strategies_data'], self.strategy_name)
         self.base_folder = base_folder or self.trainer.base_folder
@@ -536,11 +544,12 @@ class StrategyModelComparator:
         self.depth_surrogate = depth_surrogate
         self.results = []
         self.results_dd = []
-        self.comparison_file_name = f"comparison_{self.strategy_name}.csv"
-        self.comparison_file_name_dd = f"comparison_dd_{self.strategy_name}.csv"
+        dd_path = '' if not dd_mode else '_d'
+        self.comparison_file_name = f"comparison{dd_path}_{self.strategy_name}.csv"
+        # self.comparison_file_name_dd = f"comparison_dd_{self.strategy_name}.csv"
         # self.comparison_file_path = os.path.join(self.base_folder, self.comparison_file_name)
         self.comparison_file_path = os.path.join(self.trainer.outputs_folder, self.comparison_file_name)
-        self.comparison_file_path_dd = os.path.join(self.trainer_dd.outputs_folder, self.comparison_file_name_dd)
+        # self.comparison_file_path_dd = os.path.join(self.trainer_dd.outputs_folder, self.comparison_file_name_dd)
 
     def run(self):
 
@@ -566,16 +575,23 @@ class StrategyModelComparator:
                 continue
 
             base_name = filename.replace('results_', '').replace('.csv', '')
-            target = base_name[len(strategy_name):].strip('_')  # Remove any leading underscores, target will be everything that comes after the strategy_name part
+            # target = base_name[len(strategy_name):].strip('_')  # Remove any leading underscores, target will be everything that comes after the strategy_name part
+
+            # Extract the target by removing strategy_name and anything after "_delay"
+            target_start = len(self.strategy_name) # Start after strategy_name
+            delay_pos = base_name.find('_delay') # Check if '_delay' exists and find its position
+            target = base_name[target_start:delay_pos].strip('_')
+            entry_delay = int(base_name[delay_pos + 6:])  # 6 is the length of '_delay'
 
             # trainer = ModelTrainer(model_type=self.model_type, selector_type=self.selector_type, label_column=self.label_column,
             #                         strategy=strategy_name, timeframe=timeframe, target=target, clip_outliers=self.clip_outliers,
             #                         depth_surrogate=self.depth_surrogate, show_clipping_report=False, show_figures=False, plot_trim_distributions=False)
-            for t in [self.trainer, self.trainer_dd]:
+            for t in [self.trainer]:#, self.trainer_dd]:
                 t.target = target
+                t.entry_delay = entry_delay
                 t.create_paths()
 
-            log_file_path = os.path.join(self.logs_folder, f"training_log_{strategy_name}_{self.trainer.timeframe_str}_{target}.txt")
+            log_file_path = os.path.join(self.logs_folder, f"training_log_{strategy_name}_{self.trainer.timeframe_str}_{target}_delay{entry_delay}.txt")
 
             df = pd.read_csv(file_path)
 
@@ -592,9 +608,9 @@ class StrategyModelComparator:
                 # try:
                 # Full training pipeline
                 results = self.trainer.fit(df)
-                results_dd = self.trainer_dd.fit(df)
+                # results_dd = self.trainer_dd.fit(df)
 
-                for t in [self.trainer, self.trainer_dd]:
+                for t in [self.trainer]:#, self.trainer_dd]:
                     if not t.model_type == 'stacking':
                         t.explainer.plot_dependence(t.shap_values.feature_names[0])
                         t.explainer.plot_dependence(t.shap_values.feature_names[1])
@@ -607,7 +623,7 @@ class StrategyModelComparator:
                     print(revised_logic)
 
                 self.results.append(results)
-                self.results_dd.append(results_dd)
+                # self.results_dd.append(results_dd)
                 # except Exception as e:
                 #     print(f"⚠️ Failed to train model for {self.strategy_name} {timeframe} {target}. Error: {e}")
 
@@ -619,10 +635,10 @@ class StrategyModelComparator:
         df.to_csv(self.comparison_file_path, index=False)
         print(f"✅ Saved comparison results at {self.comparison_file_path}")
 
-        df_dd = pd.DataFrame(self.results_dd)
-        os.makedirs(self.trainer_dd.outputs_folder, exist_ok=True)
-        df_dd.to_csv(self.comparison_file_path_dd, index=False)
-        print(f"✅ Saved comparison results drawdowns at {self.comparison_file_path_dd}")
+        # df_dd = pd.DataFrame(self.results_dd)
+        # os.makedirs(self.trainer_dd.outputs_folder, exist_ok=True)
+        # df_dd.to_csv(self.comparison_file_path_dd, index=False)
+        # print(f"✅ Saved comparison results drawdowns at {self.comparison_file_path_dd}")
 
 
 if __name__ == "__main__":
@@ -635,6 +651,7 @@ if __name__ == "__main__":
     args = sys.argv
     # display_res = 'display' in args
     revised = 'revised' in args
+    dd_mode = 'dd' in args
     strategy_name = next((arg[9:] for arg in args if arg.startswith('strategy=')), '')
     selector = next((arg[9:] for arg in args if arg.startswith('selector=') and arg[9:] in ['rf', 'rfe', 'rfecv']), 'rfe')
 
@@ -651,7 +668,8 @@ if __name__ == "__main__":
     rev = '' if not revised else '_R'
     strategy = strategy_name + rev
 
-    strategy_model_comparator = StrategyModelComparator(strategy_name, clip_outliers=True, model_type=model_type, selector_type=selector , label_column=label_column)
+    strategy_model_comparator = StrategyModelComparator(strategy_name, clip_outliers=True, model_type=model_type, selector_type=selector, 
+                                                        label_column=label_column, dd_mode=dd_mode)
     strategy_model_comparator.run()
     # strategies_folder = PATHS.folders_path['strategies_data']
     # strategy_folder = os.path.join(strategies_folder, strategy)

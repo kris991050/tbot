@@ -39,9 +39,9 @@ class ModelExplainer:
 
         return self.shap_values, X_sample
     
-    def plot_shaps(self, strategy, timeframe, target, X_sample):
+    def plot_shaps(self, strategy, timeframe, target, entry_delay, X_sample):
         # SHAP summary plot
-        title = f"SHAP summary for strategy {strategy}, timeframe {timeframe}, target {target}"
+        title = f"SHAP summary for strategy {strategy}, timeframe {timeframe}, target {target}, delay {entry_delay}"
         for shap_type in self.shap_types:
             self._plot_shap(self.shap_values, X_sample, plot_type=shap_type, title=title)
 

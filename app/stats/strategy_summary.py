@@ -26,7 +26,7 @@ class StrategyResultsSummary:
             if df.empty:
                 continue
 
-            base_group_cols = ['strategy', 'timeframe', 'target']
+            base_group_cols = ['strategy', 'timeframe', 'target', 'entry_delay']
             if group_by_feature and group_by_feature in df.columns:
                 group_cols = base_group_cols + [group_by_feature]
                 grouped = df.groupby(group_cols)

@@ -30,7 +30,7 @@ class BacktestOrchestrator:
         self.all_trades = []
 
     def setup_paths(self):
-        self.file_name_pattern = f"{self.engine_type}_{self.manager.strategy_name}_{self.manager.config.model_type}_{self.manager.config.selector_type}_{self.mode}_{self.manager.strategy_instance.timeframe}_seed{self.seed}_{self.manager.strategy_instance.target_handler.target_str}_{self.manager.config.stop}_pred{str(self.manager.config.pred_th)}"
+        self.file_name_pattern = f"{self.engine_type}_{self.manager.strategy_name}_{self.manager.config.model_type}_{self.manager.config.selector_type}_{self.mode}_{self.manager.strategy_instance.timeframe}_seed{self.seed}_{self.manager.strategy_instance.target_handler.target_str}_{self.manager.config.stop}_pred{str(self.manager.config.pred_th)}_delay{self.entry_delay}"
         base_folder = PATHS.folders_path['strategies_data']
         self.outputs_folder = os.path.join(base_folder, self.manager.strategy_name, f'backtest_{self.file_name_pattern}')
         # self.data_folder = os.path.join(base_folder, 'backtest_data')
@@ -221,7 +221,7 @@ if __name__ == "__main__":
     symbol = next((arg[7:] for arg in args if arg.startswith('symbol=')), [])
     # pred_th = next((float(arg[7:]) for arg in args if arg.startswith('predth=')), None)
     mode = next((arg[5:] for arg in args if arg.startswith('mode=')), 'backtest')
-    entry_delay = next((arg[10:] for arg in args if arg.startswith('entry_delay=')), 1)
+    entry_delay = next((int(arg[12:]) for arg in args if arg.startswith('entry_delay=')), 1)
     stop = next((arg[5:] for arg in args if arg.startswith('stop=')), 'levels') # 'predicted_drawdown'
     selector = next((arg[9:] for arg in args if arg.startswith('selector=') and arg[9:] in ['rf', 'rfe', 'rfecv']), 'rf')
 

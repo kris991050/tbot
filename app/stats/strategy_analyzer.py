@@ -16,7 +16,7 @@ from ml import features_processor
 class StrategyAnalyzer:
 
     def __init__(self, ib:IB, symbols:list, strategy:BaseStrategy, config:list, mtf:list, from_time:pd.Timestamp=None, to_time:pd.Timestamp=None,
-                 entry_delay:int=1, base_timeframe:Timeframe=None, hist_folder:str=None, file_format='parquet', **kwargs):
+                 base_timeframe:Timeframe=None, hist_folder:str=None, file_format='parquet', **kwargs):
         self.ib = ib
         self.symbols = symbols
         self.strategy_instance = strategy
@@ -27,7 +27,6 @@ class StrategyAnalyzer:
         self.from_time = from_time
         self.base_timeframe = base_timeframe or Timeframe()
         self.hist_folder = hist_folder or PATHS.folders_path['hist_market_data']
-        self.entry_delay = entry_delay
         self.file_format = file_format
         self.drop_levels = True
         self.df_results_list = pd.DataFrame()
@@ -79,7 +78,7 @@ class StrategyAnalyzer:
         elif mode == 'reward_to_risk':
             return np.nan if max_drawdown == 0 else max_profit / abs(max_drawdown)
 
-    def compute_stats(self, df, trigger_time, target_time, trigger_column, target_handler, side):
+    def compute_stats(self, df, trigger_time, target_time, trigger_column, target_handler, entry_delay, side):
 
         TRADING_MINUTES_PER_YEAR = 252 * 390
         epsilon = 1e-6  # To prevent division by zero
@@ -163,6 +162,7 @@ class StrategyAnalyzer:
             'timeframe_min': timeframe_min,
             'strategy': trigger_column,
             'target': target_handler.target_str,
+            'entry_delay': entry_delay, 
             'data_to_time': df.attrs['data_to_time'],
             'data_from_time': df.attrs['data_from_time'],
             'trig_time': trigger_time,
@@ -210,7 +210,7 @@ class StrategyAnalyzer:
         #     return None
 
 
-    def analyze_post_trigger(self, df, trigger_column, target_handler, side):
+    def analyze_post_trigger(self, df, trigger_column, target_handler, entry_delay, side):
         # target can now be a string (e.g. 'eod', 'vwap_cross') or timedelta, or a TargetHandler instance
 
         results = []
@@ -231,13 +231,13 @@ class StrategyAnalyzer:
             try:
                 trigger_time_idx = df.index.get_loc(trigger_time)
 
-                if not trigger_time_idx + self.entry_delay >= len(df):
+                if not trigger_time_idx + entry_delay >= len(df):
                     # Delay entry by one bar
-                    delayed_trigger_time = df.index[trigger_time_idx + self.entry_delay]
+                    delayed_trigger_time = df.index[trigger_time_idx + entry_delay]
                     # print(f"Trigger at {trigger_time} → Entry at {delayed_trigger_time}")
 
                     target_time = target_handler.get_target_time(df, delayed_trigger_time)
-                    result = self.compute_stats(df, trigger_time, target_time, trigger_column, target_handler, side)
+                    result = self.compute_stats(df, trigger_time, target_time, trigger_column, target_handler, entry_delay, side)
                     if result:
                         results.append(result)
 
@@ -254,7 +254,7 @@ class StrategyAnalyzer:
 
         return pd.DataFrame(results)#.dropna()
 
-    def pre_analyze(self, df, targets):
+    def pre_analyze(self, df, targets, entry_delays):
         # targets is either timedelta ('5 min') either 'eod_rth', either 'eod'
 
         timeframe = helpers.get_df_timeframe(df)
@@ -269,15 +269,16 @@ class StrategyAnalyzer:
         df_results_list = []
         for col in self.trigger_columns:
             side = side_map(col)
-            for i, target_handler in enumerate(targets):
-                print(f"⚙️ Analyzing with target {i+1} out of {len(targets)}")
+            for delay in entry_delays:
+                for i, target_handler in enumerate(targets):
+                    print(f"⚙️ Analyzing with target {i+1} out of {len(targets)}, delay {delay}")
 
-                if timeframe.pandas in ['1D', '1W', '1M'] and isinstance(target_handler, EODTargetHandler):
-                    print("Cannot use 'eod' or 'eod_rth' with daily or higher timeframes.")
-                    continue
+                    if timeframe.pandas in ['1D', '1W', '1M'] and isinstance(target_handler, EODTargetHandler):
+                        print("Cannot use 'eod' or 'eod_rth' with daily or higher timeframes.")
+                        continue
 
-                df_results = self.analyze_post_trigger(df, trigger_column=col, target_handler=target_handler, side=side)
-                df_results_list.append(df_results)
+                    df_results = self.analyze_post_trigger(df, trigger_column=col, target_handler=target_handler, entry_delay=delay, side=side)
+                    df_results_list.append(df_results)
 
         return df_results_list
 
@@ -340,7 +341,7 @@ class StrategyAnalyzer:
                 # Analyze strategy
                 print("Analyzing strategy ", strategy, " for symbol ", contract.symbol, " and timeframe ", tf['timeframe'], "...")
                 time_now_start = datetime.datetime.now()
-                df_results_tf_list = self.pre_analyze(df_tf, targets=tf['targets'])
+                df_results_tf_list = self.pre_analyze(df_tf, targets=tf['targets'], entry_delays=tf['entry_delays'])
                 print("\nTime elapsed for analyzing ", strategy, " on ", symbol, ": ", datetime.datetime.now() - time_now_start, "\n")
 
                 # Remove transformed features from df_tf before saving
@@ -355,7 +356,7 @@ class StrategyAnalyzer:
 
         # Concatenate results across symbols by strategy, timeframe and target period
         df_results_combined = pd.concat(df_results_list, ignore_index=True) if df_results_list else pd.DataFrame
-        self.df_results_list = [group for _, group in df_results_combined.groupby(['strategy', 'target', 'timeframe'])] if not df_results_combined.empty else []
+        self.df_results_list = [group for _, group in df_results_combined.groupby(['strategy', 'target', 'timeframe', 'entry_delay'])] if not df_results_combined.empty else []
 
         # return df_summary, df_results_combined, df_list
         return self.df_results_list
