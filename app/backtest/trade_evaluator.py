@@ -109,8 +109,8 @@ class TradeEvaluator:
                   stop_price, reason2close, symbol, entry_exec_price, exit_exec_price, entry_commission, exit_commission, rounding=2):
         trade_df = df.iloc[entry_idx:exit_idx + 1]
         close_prices = trade_df['close']
-        highs = trade_df['high']
-        lows = trade_df['low']
+        highs = trade_df['high'][1:] # Exclude first element as high and low of first bar is before actual entry
+        lows = trade_df['low'][1:]
 
         market_cap = df.attrs.get('market_cap', None)
         market_cap_cat = helpers.categorize_market_cap(market_cap) if market_cap is not None else 'Unknown'

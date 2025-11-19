@@ -5,9 +5,11 @@ sys.path.append(parent_folder)
 
 from utils import helpers
 from utils.constants import CONSTANTS, FORMATS, PATHS
+from utils.timeframe import Timeframe
 from execution import trade_manager
 from strategy_analyzer import StrategyAnalyzer
-from strategies import rs3_strategy, breakouts_strategy
+from strategies import breakout_strategy, rs3_strategy
+from live import trading_config
 import strategy_summary
 
 
@@ -50,7 +52,7 @@ if __name__ == "__main__":
     file_format = next((arg[7:] for arg in args if arg.startswith('format=') and arg[7:] in FORMATS.DATA_FILE_FORMATS_LIST), 'parquet')
     strategy = next((arg[9:] for arg in args if arg.startswith('strategy=')), '')
     single_symbol = next((arg[7:] for arg in args if arg.startswith('symbol=')), None)
-    entry_delay = next((arg[10:] for arg in args if arg.startswith('entry_delay=')), 1)
+    # entry_delay = next((arg[10:] for arg in args if arg.startswith('entry_delay=')), 1)
 
     # helpers.test_internet_speed()
 
@@ -80,43 +82,58 @@ if __name__ == "__main__":
     if 'bb_rsi_reversal' in strategy:
 
         mtf = None
-        entry_delays = [1]
         strategy_func = trade_manager.get_strategy_instance(strategy_name=strategy, revised=revised, rsi_threshold=75, cam_M_threshold=4)
-        config = [{'timeframe': strategy_func.timeframe, 'targets': [strategy_func.target_handler], 'entry_delays': entry_delays, 'mtf': mtf}]
+        config = [{'timeframe': strategy_func.timeframe, 'targets': [strategy_func.target_handler], 'mtf': mtf}]
     
     if 'sr_bounce' in strategy:
 
         mtf = None
-        entry_delays = [0, 1]
         strategy_func_list = []
         target_list = []
-        for ttf in [1, 2.5, 5, 7.5, 10]:
-            strategy_func = trade_manager.get_strategy_instance(strategy_name=strategy, revised=revised, cam_M_threshold=3, target_factor=ttf)
+        for ttf in [1.5, 2, 5]:
+            config = trading_config.TradingConfig()
+            config.strategy_name = strategy
+            config.perc_gain = ttf
+            strategy_func = trade_manager.get_strategy_instance(strategy_name=strategy, config=config)
             # strategy_func = trade_manager.get_strategy_instance(strategy_name=strategy, revised=revised, cam_M_threshold=3, max_time_factor=ttf)
             strategy_func_list.append(strategy_func)
             target_list.append(strategy_func.target_handler)
         # strategy_func = trade_manager.get_strategy_instance(strategy_name=strategy, revised=revised, cam_M_threshold=3, target_factor=5, max_time_factor=50)
         # config = [{'timeframe': strategy_func.timeframe, 'targets': [strategy_func.target_handler], 'mtf': mtf}]
-        config = [{'timeframe': strategy_func.timeframe, 'targets': target_list, 'entry_delays': entry_delays, 'mtf': mtf}]
+        config = [{'timeframe': strategy_func.timeframe, 'targets': target_list, 'mtf': mtf}]
 
-    elif 'breakouts' in strategy:
+    elif 'breakout' in strategy:
 
-        # bb_rsi_tf_list = []
         mtf = None
-        # config = [{'timeframe': '60min', 'targets': ['120 min', '240 min', 'eod', 'eod_rth']},
-        #                         {'timeframe': '1D', 'targets': ['1 D', '5 D']}]
-        config = [{'timeframe': '5min', 'targets': ['15min', '60min', 'eod', 'eod_rth']},
-                                {'timeframe': '60min', 'targets': ['120min', '240min', 'eod', 'eod_rth']},
-                                {'timeframe': '1D', 'targets': ['1D', '5D']}]
-        # config_breakouts = [{'timeframe': '1min', 'targets': ['5 min', '60 min', 'eod', 'eod_rth']},
-        #                         {'timeframe': '5min', 'targets': ['15 min', '60 min', 'eod', 'eod_rth']},
-        #                         {'timeframe': '60min', 'targets': ['120 min', '240 min', 'eod', 'eod_rth']},
-        #                         {'timeframe': '1D', 'targets': ['1 D', '5 D']}]
+        strategy_func_list = []
+        target_list = []
+        for ttf in [5, 7.5, 10]:
+            config = trading_config.TradingConfig()
+            config.strategy_name = strategy
+            config.perc_gain = ttf
+            strategy_func = trade_manager.get_strategy_instance(strategy_name=strategy, config=config)
+            # strategy_func = trade_manager.get_strategy_instance(strategy_name=strategy, revised=revised, cam_M_threshold=3, max_time_factor=ttf)
+            strategy_func_list.append(strategy_func)
+            target_list.append(strategy_func.target_handler)
+        # strategy_func = trade_manager.get_strategy_instance(strategy_name=strategy, revised=revised, cam_M_threshold=3, target_factor=5, max_time_factor=50)
+        # config = [{'timeframe': strategy_func.timeframe, 'targets': [strategy_func.target_handler], 'mtf': mtf}]
+        config = [{'timeframe': strategy_func.timeframe, 'targets': target_list, 'mtf': mtf}]
+        # # bb_rsi_tf_list = []
+        # mtf = None
+        # # config = [{'timeframe': '60min', 'targets': ['120 min', '240 min', 'eod', 'eod_rth']},
+        # #                         {'timeframe': '1D', 'targets': ['1 D', '5 D']}]
+        # config = [{'timeframe': '5min', 'targets': ['15min', '60min', 'eod', 'eod_rth']},
+        #                         {'timeframe': '60min', 'targets': ['120min', '240min', 'eod', 'eod_rth']},
+        #                         {'timeframe': '1D', 'targets': ['1D', '5D']}]
+        # # config_breakouts = [{'timeframe': '1min', 'targets': ['5 min', '60 min', 'eod', 'eod_rth']},
+        # #                         {'timeframe': '5min', 'targets': ['15 min', '60 min', 'eod', 'eod_rth']},
+        # #                         {'timeframe': '60min', 'targets': ['120 min', '240 min', 'eod', 'eod_rth']},
+        # #                         {'timeframe': '1D', 'targets': ['1 D', '5 D']}]
 
         if strategy == 'breakouts_bull':
-            strategy_func_bull = breakouts_strategy.BreakoutsStrategy()
+            strategy_func_bull = breakout_strategy.BreakoutsStrategy()
         elif strategy == 'breakouts_bear':
-            strategy_func_bear = breakouts_strategy.BreakoutsStrategy()
+            strategy_func_bear = breakout_strategy.BreakoutsStrategy()
 
 
     elif strategy == 'rs3_bull':
@@ -136,7 +153,7 @@ if __name__ == "__main__":
         strategy_func = rs3_strategy.RS3StrategyBull(daily_pivots=True)
 
 
-    df_results_list = StrategyAnalyzer(ib, symbols, strategy_func, config, mtf, from_time=from_time, to_time=to_time, entry_delay=entry_delay, 
+    df_results_list = StrategyAnalyzer(ib, symbols, strategy_func, config, mtf, from_time=from_time, to_time=to_time, 
                                        file_format=file_format).assess()
 
 
@@ -158,15 +175,16 @@ if __name__ == "__main__":
             df_all_results = pd.concat(df_results_list, ignore_index=True)
 
             # Group by timeframe and strategy
-            grouped = df_all_results.groupby(['timeframe', 'strategy', 'target', 'entry_delay'])
+            grouped = df_all_results.groupby(['timeframe', 'strategy', 'target'])
             df_results_list_grouped = []
-            for (timeframe, strategy_name, target, entry_delay), df_group in grouped:
+            for (timeframe, strategy_name, target), df_group in grouped:
                 # Reorder data per trigger time
                 df_group_sorted = df_group.sort_values("trig_time").reset_index(drop=True)
 
                 df_results_list_grouped.append(df_group_sorted)
 
                 # Save to file
+                entry_delay = helpers.get_entry_delay_from_timeframe(Timeframe(timeframe))
                 # filename = f"results_{strategy_name}_{timeframe.replace('/', '_')}_{target.replace('/', '_')}.csv"
                 filename = f"results_{strategy_name}_{target.replace('/', '_')}_delay{entry_delay}.csv"
                 filepath = os.path.join(strategy_folder, filename)

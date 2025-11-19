@@ -15,7 +15,7 @@ from execution import trade_manager
 
 class BacktestOrchestrator:
     def __init__(self, ib:IB, strategy_name:str, stop=None, revised:bool=False, symbols:list=None, seed:int=None, timeframe=Timeframe(), 
-                 config=None, engine_type:str='custom', selector_type:str='rf', entry_delay:int=1, mode:str='backtest', timezone=None, 
+                 config=None, engine_type:str='custom', selector_type:str='rf', mode:str='backtest', timezone=None, 
                  look_bacward:str=None, step_duration:str=None):
         self.manager = trade_manager.TradeManager(ib, config, strategy_name, stop, revised=revised, look_backward=look_bacward, step_duration=step_duration, 
                                                   selector_type=selector_type, timezone=timezone)
@@ -23,14 +23,13 @@ class BacktestOrchestrator:
         # self.required_columns = self.manager.get_required_columns()
         self.seed = seed
         self.engine_type = engine_type
-        self.entry_delay = entry_delay
         self.mode = helpers.set_var_with_constraints(mode, CONSTANTS.MODES['backtest'])
         self.setup_paths()
         self.symbols = self.get_symbols(symbols)
         self.all_trades = []
 
     def setup_paths(self):
-        self.file_name_pattern = f"{self.engine_type}_{self.manager.strategy_name}_{self.manager.config.model_type}_{self.manager.config.selector_type}_{self.mode}_{self.manager.strategy_instance.timeframe}_seed{self.seed}_{self.manager.strategy_instance.target_handler.target_str}_{self.manager.config.stop}_pred{str(self.manager.config.pred_th)}_delay{self.entry_delay}"
+        self.file_name_pattern = f"{self.engine_type}_{self.manager.strategy_name}_{self.manager.config.model_type}_{self.manager.config.selector_type}_{self.mode}_{self.manager.strategy_instance.timeframe}_seed{self.seed}_{self.manager.strategy_instance.target_handler.target_str}_{self.manager.config.stop}_pred{str(self.manager.config.pred_th)}_delay{self.manager.entry_delay}"
         base_folder = PATHS.folders_path['strategies_data']
         self.outputs_folder = os.path.join(base_folder, self.manager.strategy_name, f'backtest_{self.file_name_pattern}')
         # self.data_folder = os.path.join(base_folder, 'backtest_data')
@@ -89,9 +88,9 @@ class BacktestOrchestrator:
 
     def select_engine(self, df, symbol):
         if self.engine_type == 'custom':
-            return custom_backtester.CustomBacktestEngine(df, symbol, self.manager, self.entry_delay)
+            return custom_backtester.CustomBacktestEngine(df, symbol, self.manager)
         elif self.engine_type == 'backtrader':
-            return backtrader_backtester.BacktraderBacktestEngine(df=df, symbol=symbol, manager=self.manager, entry_delay=self.entry_delay)
+            return backtrader_backtester.BacktraderBacktestEngine(df=df, symbol=symbol, manager=self.manager)
         else:
             raise ValueError(f"Unknown engine type: {self.engine_type}")
 
@@ -215,13 +214,14 @@ if __name__ == "__main__":
     paperTrading = not 'live' in args
     local_ib = 'local' in args
     revised = 'revised' in args
+    # multpile_runs = 'multiple' in args
     seed = next((int(arg[5:]) for arg in args if arg.startswith('seed=')), None)
     strategy_name = next((arg[9:] for arg in args if arg.startswith('strategy=')), '')
     engine_type = next((arg[7:] for arg in args if arg.startswith('engine=')), 'backtrader') # or 'custom'
     symbol = next((arg[7:] for arg in args if arg.startswith('symbol=')), [])
     # pred_th = next((float(arg[7:]) for arg in args if arg.startswith('predth=')), None)
     mode = next((arg[5:] for arg in args if arg.startswith('mode=')), 'backtest')
-    entry_delay = next((int(arg[12:]) for arg in args if arg.startswith('entry_delay=')), 1)
+    # entry_delay = next((int(arg[12:]) for arg in args if arg.startswith('entry_delay=')), 1)
     stop = next((arg[5:] for arg in args if arg.startswith('stop=')), 'levels') # 'predicted_drawdown'
     selector = next((arg[9:] for arg in args if arg.startswith('selector=') and arg[9:] in ['rf', 'rfe', 'rfecv']), 'rf')
 
@@ -229,7 +229,21 @@ if __name__ == "__main__":
     ib, _ = helpers.IBKRConnect_any(IB(), paper=paperTrading, remote=not local_ib)
 
     symbols = [symbol] if symbol else []
+    # symbols = ['ALL', 'CME']
 
     orchestrator = BacktestOrchestrator(ib, strategy_name, revised=revised, stop=stop, symbols=symbols, seed=seed, engine_type=engine_type, 
-                                        selector_type=selector, entry_delay=entry_delay, mode=mode)
+                                            selector_type=selector, mode=mode)
     orchestrator.run()
+    
+
+    # if not multpile_runs:
+    #     orchestrator = BacktestOrchestrator(ib, strategy_name, revised=revised, stop=stop, symbols=symbols, seed=seed, engine_type=engine_type, 
+    #                                         selector_type=selector, mode=mode)
+    #     orchestrator.run()
+    # else:
+    #     for entry_delay in [0, 1]:
+    #         for stop in ['levels']:
+    #             for 
+    #     orchestrator = BacktestOrchestrator(ib, strategy_name, revised=revised, stop=stop, symbols=symbols, seed=seed, engine_type=engine_type, 
+    #                                         selector_type=selector, entry_delay=entry_delay, mode=mode)
+    #     orchestrator.run()

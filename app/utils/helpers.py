@@ -78,11 +78,14 @@ def IBKRConnect_any(ib:IB=IB(), paper:bool=True, client_id:int=None, remote:bool
 def IBKRConnect(ib:IB=IB(), paper:bool=True, client_id:int=None, remote:bool=True):
     ib_ip = CONSTANTS.IB_IP_REMOTE if remote else CONSTANTS.IB_IP_LOCAL
     port_number = CONSTANTS.IB_PORT_PAPER if paper else CONSTANTS.IB_PORT_LIVE
-    max_clientId = 10 if not client_id else 1
-    clientId = 1 if not client_id else client_id
+    # clientId = 1 if not client_id else client_id
+
+    client_ids = [client_id] if client_id else range(1, CONSTANTS.IB_MAX_CLIENTS + 1)
     
     try:
-        while clientId <= max_clientId and not ib.isConnected():
+        for clientId in client_ids:
+            if ib.isConnected():
+                break
             try:
                 ib.connect(ib_ip, port_number, clientId=clientId, timeout=2)
             except Exception as e:
@@ -132,6 +135,10 @@ def set_var_with_constraints(var, allowed_list):
         raise ValueError(f"Invalid mode: {var}. Must be from {allowed_list}")
     else:
         return var
+
+
+def get_entry_delay_from_timeframe(timeframe:Timeframe):
+    return 0 if timeframe.to_timedelta >= Timeframe(CONSTANTS.ENTRY_DELAY_CUTOFF_TIMEFRAME).to_timedelta else 1
 
 
 def get_stock_currency_yf(symbol:str):

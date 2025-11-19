@@ -60,15 +60,19 @@ class StrategyResultsSummary:
                 label_binary_dist = group_df['label_binary'].value_counts(normalize=True).round(4).to_dict()
                 label_multi_dist = group_df['label_multi'].value_counts(normalize=True).round(4).to_dict()
 
+                sharpe_ratio_bar = group_df['sharpe_ratio_bar'].mean()
+                sharpe_ratio_yearly = group_df['sharpe_ratio_yearly'].mean()
+                sortino_ratio_bar = group_df['sortino_ratio_bar'].mean()
+                sortino_ratio_yearly = group_df['sortino_ratio_yearly'].mean()
                 summary = {
                     'trigger_count': len(group_df),
                     'mean_end_profit_per_min': group_df['end_profit_per_min'].mean().round(4),
                     'median_end_profit_per_min': group_df['end_profit_per_min'].median().round(4),
                     'profit_%': round(group_df['is_profit'].mean() * 100, 2),
-                    'mean_sharpe_ratio_bar': group_df['sharpe_ratio_bar'].mean().round(2),
-                    'mean_sharpe_ratio_yearly': group_df['sharpe_ratio_yearly'].mean().round(2),
-                    'mean_sortino_ratio_bar': group_df['sortino_ratio_bar'].mean().round(2),
-                    'mean_sortino_ratio_yearly': group_df['sortino_ratio_yearly'].mean().round(2),
+                    'mean_sharpe_ratio_bar': sharpe_ratio_bar.round(2) if not pd.isna(sharpe_ratio_bar) else None,
+                    'mean_sharpe_ratio_yearly': sharpe_ratio_yearly.round(2) if not pd.isna(sharpe_ratio_yearly) else None,
+                    'mean_sortino_ratio_bar': sortino_ratio_bar.round(2) if not pd.isna(sortino_ratio_bar) else None,
+                    'mean_sortino_ratio_yearly': sortino_ratio_yearly.round(2) if not pd.isna(sortino_ratio_yearly) else None,
                     'win_loss_ratio': win_loss_ratio.round(2) if win_loss_ratio != float('inf') else win_loss_ratio,
                     'mean_even_duration': group_df['event_duration'].mean().round(2),
                     'max_drawdown_per_min': group_df['max_drawdown_per_min'].min().round(4),

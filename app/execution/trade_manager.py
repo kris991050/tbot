@@ -9,25 +9,30 @@ from utils.constants import FORMATS, PATHS, CONSTANTS
 from utils.timeframe import Timeframe
 from strategies import target_handler
 from data import hist_market_data_handler
-from strategies import bb_rsi_reversal_strategy, sr_bounce_strategy
+from strategies import bb_rsi_reversal_strategy, sr_bounce_strategy, breakout_strategy
 from live import trading_config
 from ml import ml_trainer
 from miscellaneous import scanner
 
 
-def get_strategy_instance(strategy_name:str, revised:bool=False, rsi_threshold:int=75, cam_M_threshold:int=4, target_factor:float=5, 
-                          max_time_factor:int=50):
+def get_strategy_instance(strategy_name:str, config:trading_config.TradingConfig=None):
+    config = config or trading_config.TradingConfig()
     
     for direction in ['bull', 'bear']:
         for tf in ['1min', '2min', '5min', '15min', '1h']:
             if f'bb_rsi_reversal_{tf}_{direction}' in strategy_name:
-                return bb_rsi_reversal_strategy.BBRSIReversalStrategy(direction=direction, timeframe=Timeframe(tf), rsi_threshold=rsi_threshold, 
-                                                                      cam_M_threshold=cam_M_threshold, revised=revised)
-        
+                return bb_rsi_reversal_strategy.BBRSIReversalStrategy(direction=direction, timeframe=Timeframe(tf), rsi_threshold=config.rsi_threshold, 
+                                                                      cam_M_threshold=config.cam_M_threshold, revised=config.revised)
         for tf in ['15min', '1h', '4h', '1D']:
             if f'sr_bounce_{tf}_{direction}' in strategy_name:
-                return sr_bounce_strategy.SRBounceStrategy(direction=direction, timeframe=Timeframe(tf), cam_M_threshold=cam_M_threshold, 
-                                                           revised=revised, target_factor=target_factor, max_time_factor=max_time_factor)
+                return sr_bounce_strategy.SRBounceStrategy(direction=direction, timeframe=Timeframe(tf), cam_M_threshold=config.cam_M_threshold, 
+                                                           revised=config.revised, target_factor=config.perc_gain, 
+                                                           max_time_factor=config.max_time_factor)
+        for tf in ['5min', '15min', '1h', '4h']:
+            if f'breakout_{tf}_{direction}' in strategy_name:
+                return breakout_strategy.BreakoutStrategy(direction=direction, timeframe=Timeframe(tf), 
+                                                           revised=config.revised, target_factor=config.perc_gain, 
+                                                           max_time_factor=config.max_time_factor)
             
     raise ValueError(f"Strategy '{strategy_name}' not recognized")
 
@@ -51,13 +56,14 @@ class TradeManager:
         # self.target_handler = self.strategy_instance.target_handler
         # self.stop = stop
         # self.target_handler = self._resolve_target_handler()
+        self.entry_delay = helpers.get_entry_delay_from_timeframe(self.strategy_instance.timeframe)
         self.stop_handler = self._resolve_stop_handler()
         self.trainer, self.trainer_dd = self._load_models()
         self.direction = self._resolve_direction()
         self.all_trades = []
 
     def _get_strategy_instance(self):
-        return get_strategy_instance(self.strategy_name, self.config.revised)
+        return get_strategy_instance(self.strategy_name, self.config)
 
     def _resolve_stop_handler(self):
         # Stop-loss handler

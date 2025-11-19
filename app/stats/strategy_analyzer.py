@@ -5,7 +5,7 @@ parent_folder = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_folder)
 
 from utils import helpers
-from utils.constants import PATHS
+from utils.constants import PATHS, CONSTANTS
 from utils.timeframe import Timeframe
 from data import hist_market_data_handler
 from strategies.target_handler import EODTargetHandler
@@ -210,7 +210,7 @@ class StrategyAnalyzer:
         #     return None
 
 
-    def analyze_post_trigger(self, df, trigger_column, target_handler, entry_delay, side):
+    def analyze_post_trigger(self, df, trigger_column, target_handler, side, entry_delay):
         # target can now be a string (e.g. 'eod', 'vwap_cross') or timedelta, or a TargetHandler instance
 
         results = []
@@ -254,10 +254,11 @@ class StrategyAnalyzer:
 
         return pd.DataFrame(results)#.dropna()
 
-    def pre_analyze(self, df, targets, entry_delays):
+    def pre_analyze(self, df, targets):
         # targets is either timedelta ('5 min') either 'eod_rth', either 'eod'
 
         timeframe = helpers.get_df_timeframe(df)
+        entry_delay = helpers.get_entry_delay_from_timeframe(timeframe)
 
         side_map = lambda col: 1 if '_bull' in col else -1 if '_bear' in col else None
 
@@ -269,16 +270,15 @@ class StrategyAnalyzer:
         df_results_list = []
         for col in self.trigger_columns:
             side = side_map(col)
-            for delay in entry_delays:
-                for i, target_handler in enumerate(targets):
-                    print(f"⚙️ Analyzing with target {i+1} out of {len(targets)}, delay {delay}")
+            for i, target_handler in enumerate(targets):
+                print(f"⚙️ Analyzing with target {i+1} out of {len(targets)}")
 
-                    if timeframe.pandas in ['1D', '1W', '1M'] and isinstance(target_handler, EODTargetHandler):
-                        print("Cannot use 'eod' or 'eod_rth' with daily or higher timeframes.")
-                        continue
+                if timeframe.pandas in ['1D', '1W', '1M'] and isinstance(target_handler, EODTargetHandler):
+                    print("Cannot use 'eod' or 'eod_rth' with daily or higher timeframes.")
+                    continue
 
-                    df_results = self.analyze_post_trigger(df, trigger_column=col, target_handler=target_handler, entry_delay=delay, side=side)
-                    df_results_list.append(df_results)
+                df_results = self.analyze_post_trigger(df, trigger_column=col, target_handler=target_handler, side=side, entry_delay=entry_delay)
+                df_results_list.append(df_results)
 
         return df_results_list
 
@@ -341,7 +341,7 @@ class StrategyAnalyzer:
                 # Analyze strategy
                 print("Analyzing strategy ", strategy, " for symbol ", contract.symbol, " and timeframe ", tf['timeframe'], "...")
                 time_now_start = datetime.datetime.now()
-                df_results_tf_list = self.pre_analyze(df_tf, targets=tf['targets'], entry_delays=tf['entry_delays'])
+                df_results_tf_list = self.pre_analyze(df_tf, targets=tf['targets'])
                 print("\nTime elapsed for analyzing ", strategy, " on ", symbol, ": ", datetime.datetime.now() - time_now_start, "\n")
 
                 # Remove transformed features from df_tf before saving
@@ -356,7 +356,7 @@ class StrategyAnalyzer:
 
         # Concatenate results across symbols by strategy, timeframe and target period
         df_results_combined = pd.concat(df_results_list, ignore_index=True) if df_results_list else pd.DataFrame
-        self.df_results_list = [group for _, group in df_results_combined.groupby(['strategy', 'target', 'timeframe', 'entry_delay'])] if not df_results_combined.empty else []
+        self.df_results_list = [group for _, group in df_results_combined.groupby(['strategy', 'target', 'timeframe'])] if not df_results_combined.empty else []
 
         # return df_summary, df_results_combined, df_list
         return self.df_results_list

@@ -9,11 +9,10 @@ from execution import trade_manager
 
 
 class BacktraderBacktestEngine:
-    def __init__(self, df, symbol, manager, entry_delay=1):
+    def __init__(self, df, symbol, manager):
         self.df = df
         self.symbol = symbol
         self.manager = manager
-        self.entry_delay = entry_delay
         self.trades = []
         self.all_required_columns = self._build_all_required_columns()
         self.dropped_required_columns = []
@@ -77,7 +76,6 @@ class BacktraderBacktestEngine:
         cerebro.addstrategy(
             backtrader_wrapper.BacktraderStrategyWrapper,
             manager=self.manager,
-            entry_delay=self.entry_delay,
             total_bars=len(self.df),
             df=self.df,
             dropped_required_columns = self.dropped_required_columns
@@ -86,10 +84,14 @@ class BacktraderBacktestEngine:
         cerebro.broker.addcommissioninfo(ib_comm)
         cerebro.broker.set_slippage_perc(perc=0.001) # 0.1%
         t_now = datetime.datetime.now()
+        cerebro.addanalyzer(bt.analyzers.DrawDown, _name='drawdown') # Add the DrawDown analyzer to track the drawdown
         results = cerebro.run()#(runonce=False)
         print(f"\nElapsed time for running Cerebro: {datetime.datetime.now() - t_now}\n")
         strat = results[0]
         self.trades = getattr(strat, 'trades', [])
+        # Plot the results (equity curve, drawdown, and price chart)
+        # cerebro.plot(style='candlestick', iplot=True)
+        # cerebro.plot(style='line', iplot=False)
         return self.trades
 
 

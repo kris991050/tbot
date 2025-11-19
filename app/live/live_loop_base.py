@@ -10,11 +10,12 @@ import trading_config, live_data_logger
 
 
 class LiveLoopBase:
-    def __init__(self, worker_type:str='', wait_seconds:int=None, continuous:bool=True, single_symbol:str=None, ib_disconnect:bool=False, live_mode:str='live', config=None, 
-                 paper_trading:bool=None, remote_ib:bool=None, timezone=None):
+    def __init__(self, worker_type:str='', wait_seconds:int=None, continuous:bool=True, single_symbol:str=None, ib_disconnect:bool=False, 
+                 live_mode:str='live', ib_client_id:int=None, config=None, paper_trading:bool=None, remote_ib:bool=None, timezone=None):
         self.worker_type = worker_type
         self.live_mode = helpers.set_var_with_constraints(live_mode, CONSTANTS.MODES['live'])
-        self.config = self._resolve_config(config)
+        self.ib_client_id = ib_client_id
+        self.config = self._resolve_config(config, locals())
         self.wait_seconds = wait_seconds if wait_seconds else None
         self.continuous = continuous
         self.ib = IB()
@@ -26,7 +27,7 @@ class LiveLoopBase:
         self.logger = live_data_logger.LiveDataLogger(worker_type=self.worker_type, config=self.config)
         self.original_stdout = sys.stdout  # Save the original stdout reference, before redirecting stdout to logging class LogContext
 
-    def _resolve_config(self, config):
+    def _resolve_config(self, config, locals_main):
         if isinstance(config, trading_config.TradingConfig):
             return config
         
@@ -34,11 +35,11 @@ class LiveLoopBase:
         if os.path.exists(config_file_path):
             return trading_config.TradingConfig(live_mode=self.live_mode).load_config(config_file_path)
             
-        return trading_config.TradingConfig(live_mode=self.live_mode).set_config(locals())
+        return trading_config.TradingConfig(live_mode=self.live_mode).set_config(locals_main)
     
     def _connect_ib(self):
         print("\n🔌 Connecting IB")
-        self.ib, _ = helpers.IBKRConnect_any(self.ib, paper=self.config.paper_trading, remote=self.config.remote_ib)
+        self.ib, _ = helpers.IBKRConnect_any(self.ib, paper=self.config.paper_trading, client_id=self.ib_client_id, remote=self.config.remote_ib)
 
     def _disconnect_ib(self):
         if self.ib:
@@ -69,6 +70,7 @@ class LiveLoopBase:
 
             # while start_time <= current_time < end_time:
             now = helpers.calculate_now(sim_offset=self.config.sim_offset, tz=self.config.timezone)
+            print(f"🕰️ Time now: {now}    |   Sim offset: {self.config.sim_offset}")
             while helpers.is_between_market_times('pre-market', 'end_of_day', now=now, timezone=self.config.timezone):
 
                 self._connect_ib()

@@ -148,13 +148,13 @@ class EODTargetHandler(TargetHandler):
 class FixedTargetHandler(TargetHandler):
     def __init__(self, direction:str, max_time:timedelta=None, timezone=CONSTANTS.TZ_WORK):
         super().__init__(max_time=max_time, timezone=timezone)
-        self.direction = direction
+        self.direction = helpers.set_var_with_constraints(direction, CONSTANTS.DIRECTIONS)
         self.dir = {'bull': 'up', 'bear': 'down'}[self.direction]
         self.dir_int = {'bull': 1, 'bear': -1}[self.direction]
         self.target_price = None
         self.target_str = 'fixed'
     
-    def set_target_price(self, row:pd.Series):
+    def set_target_price(self, row:pd.Series, stop_price:float=None):
         self.target_price = row['close'] # Placeholder for now
     
     def get_target_time(self,  df:pd.DataFrame, trigger_time:pd.Timestamp) -> pd.Timestamp:
@@ -214,8 +214,20 @@ class PercGainTargetHandler(FixedTargetHandler):
         self.target_price = None
         self.target_str = f'perc_gain_{perc_gain}%'
 
-    def set_target_price(self, row:pd.Series):
-        self.target_price = row['close'] * (1 + (self.perc_gain / 100))
+    def set_target_price(self, row:pd.Series, stop_price:float=None):
+        self.target_price = row['close'] * (1 + self.dir_int * (self.perc_gain / 100))
+
+
+class ProfitRatioTargetHandler(FixedTargetHandler):
+    def __init__(self, profit_ratio:int, direction:str, max_time:timedelta=None, timezone=CONSTANTS.TZ_WORK):
+        super().__init__(direction=direction, max_time=max_time, timezone=timezone)
+        self.profit_ratio = profit_ratio
+        self.target_price = None
+        self.target_str = f'profit_ratio_{self.profit_ratio}'
+
+    def set_target_price(self, row:pd.Series, stop_price:float=None):
+        stop_price = stop_price or row['close']
+        self.target_price = row['close'] * self.dir_int * self.profit_ratio * abs(row['close'] - stop_price)
 
 
 class NextLevelTargetHandler(FixedTargetHandler):
@@ -233,8 +245,7 @@ class NextLevelTargetHandler(FixedTargetHandler):
             # cols.append(f"{level}_dist_to_next_{self.dir}_pct") # Include both raw and pct versions for flexibility
         return cols
 
-    @staticmethod
-    def _get_next_round_price_level(current_price:float) -> float:
+    def _get_next_round_price_level(self, current_price:float) -> float:
         """
         Calculate the next psychological level above the current price.
         Automatically adjusts the rounding increment based on the current price range.
@@ -246,10 +257,13 @@ class NextLevelTargetHandler(FixedTargetHandler):
         else: increment = 100  # For prices above 10000, we round to the nearest 100 (or use larger increments).
 
         # Round up to the next psychological level using the determined increment
-        psychological_level = (current_price // increment + 1) * increment
+        if self.dir_int == 1:
+            psychological_level = (current_price // increment + 1) * increment
+        if self.dir_int == -1:
+            psychological_level = (current_price // increment) * increment
         return psychological_level
 
-    def set_target_price(self, row:pd.Series):
+    def set_target_price(self, row:pd.Series, stop_price:float=None):
         dist_next_levels = [{'value': row[f"{level}_dist_to_next_{self.dir}"], 'level': level} for level in self.level_types]
         dist_next_level = min(dist_next_levels, key=lambda x: x['value'])
 
@@ -321,7 +335,8 @@ class VWAPCrossTargetHandler(TargetHandler):
         self.timeframe = timeframe or Timeframe()
         self.target_str = f'vwap_{self.timeframe}'
         self.required_columns = [self.target_str]
-        self.dir_int = {'bull': 1, 'bear': -1}[direction]
+        self.direction = helpers.set_var_with_constraints(direction, CONSTANTS.DIRECTIONS)
+        self.dir_int = {'bull': 1, 'bear': -1}[self.direction]
         
     def get_target_time(self, df:pd.DataFrame, trigger_time:pd.Timestamp) -> pd.Timestamp:
         # Ensure all required columns are present in the dataframe

@@ -14,7 +14,7 @@ class BBRSIReversalStrategy(base_strategy.BaseStrategy):
     def __init__(self, direction:str, timeframe:Timeframe, rsi_threshold:int=75, cam_M_threshold:int=4, revised:bool=False):
 
         super().__init__(name=f'bb_rsi_reversal_{timeframe}_{direction}', description=f'{direction}ish BB_RSI_Reversal signal using RSI and BB from higher timeframes')
-        self.direction = direction
+        self.direction = helpers.set_var_with_constraints(direction, CONSTANTS.DIRECTIONS)
         # self.timeframe_min = timeframe_min
         # self.timeframe = f"{timeframe_min}min" if timeframe_min == 1 else f"{timeframe_min}mins" if timeframe_min > 1 else None
         self.timeframe = timeframe

@@ -21,16 +21,17 @@ class ModelTrainer:
     # model types: 'xgboost', 'rf', 'linear'
     # selector types: 'rf', 'rfe', 'rfecv'
     def __init__(self, model_type:str='xgboost', selector_type:str='rf', label_column:str='label_binary', strategy_name:str='',
-                 target:str='', entry_delay:int=1, base_models:str=None, base_folder:str=None, top_n_features:int=10, train_size:float=0.7, 
+                 target:str='', base_models:str=None, base_folder:str=None, top_n_features:int=10, train_size:float=0.7, 
                  validation_size:float=0.15, depth_surrogate:int=3, clip_outliers:bool=True, show_figures:bool=False, shap_types:list=None, 
                  drawdown:bool=False, **preprocessor_kwargs):
 
         self.model_type = model_type
         self.base_models = base_models or ['rf', 'xgboost', 'linear']
         self.strategy_name = strategy_name
-        self.timeframe_str = trade_manager.get_strategy_instance(self.strategy_name).timeframe.pandas
+        timeframe = trade_manager.get_strategy_instance(self.strategy_name).timeframe
+        self.timeframe_str = timeframe.pandas
         self.target = target
-        self.entry_delay = entry_delay
+        self.entry_delay = helpers.get_entry_delay_from_timeframe(timeframe)
         self.label_column = label_column
         self.top_n_features = top_n_features
         self.train_size = train_size

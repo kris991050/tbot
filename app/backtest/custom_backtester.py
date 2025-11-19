@@ -72,13 +72,12 @@ def load_test_data(ib, symbol, trainer, data_path, file_format='parquet'):
 
 
 class CustomBacktestEngine:
-    def __init__(self, df, symbol, manager, entry_delay=1):#, mode='live'):
+    def __init__(self, df, symbol, manager):#, mode='live'):
         self.df = df.reset_index(drop=True)#.copy()
         self.symbol = symbol
         self.manager = manager
         self.active_stop_price = None  # stores fixed stop-loss value for current trade
         self.trades = []
-        self.entry_delay = entry_delay
         self.df_tr = self._build_df_tr()
         self.entry_exec_price = None
         self.exit_exec_price = None
@@ -104,10 +103,10 @@ class CustomBacktestEngine:
 
         df = self.df if not self.manager.strategy_instance.revised else self.df_tr
 
-        for i in tqdm.tqdm(range(self.entry_delay, len(df)), desc=f"Backtesting {self.symbol}"):
+        for i in tqdm.tqdm(range(self.manager.entry_delay, len(df)), desc=f"Backtesting {self.symbol}"):
 
-            decision_row = df.iloc[i - self.entry_delay]
-            prev_decision_row = df.iloc[i - self.entry_delay - 1] if i - self.entry_delay - 1 >= 0 else decision_row
+            decision_row = df.iloc[i - self.manager.entry_delay]
+            prev_decision_row = df.iloc[i - self.manager.entry_delay - 1] if i - self.manager.entry_delay - 1 >= 0 else decision_row
             # prev_row = df.iloc[i - 1]
             curr_row = df.iloc[i]
 
@@ -124,13 +123,14 @@ class CustomBacktestEngine:
                     entry_prediction = curr_row['model_prediction']
                     quantity = self.manager.evaluate_quantity(entry_prediction)
 
+                    # Resolve stop once here
+                    self.active_stop_price = self.manager.resolve_stop_price(curr_row, self.active_stop_price)
+
+                    # Set target entry time and price
                     if hasattr(self.manager.strategy_instance.target_handler, 'set_entry_time'):
                         self.manager.strategy_instance.target_handler.set_entry_time(curr_row['date'])
                     if hasattr(self.manager.strategy_instance.target_handler, 'set_target_price'):
-                        self.manager.strategy_instance.target_handler.set_target_price(row=decision_row)
-
-                    # Resolve stop once here
-                    self.active_stop_price = self.manager.resolve_stop_price(curr_row, self.active_stop_price)
+                        self.manager.strategy_instance.target_handler.set_target_price(row=decision_row, stop_price=self.active_stop_price)
 
                     reason2close = self.manager.assess_reason2close(decision_row, prev_decision_row, self.active_stop_price)
                     if not reason2close:

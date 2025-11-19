@@ -28,6 +28,7 @@ class CONSTANTS():
         IB_IP_REMOTE = '18.116.186.191'
         IB_PORT_LIVE = 7496
         IB_PORT_PAPER = 4002#7497
+        IB_MAX_CLIENTS = 10
 
         TZ_WORK_STR = 'US/Eastern'
         TZ_WORK = pytz.timezone(TZ_WORK_STR)
@@ -56,6 +57,8 @@ class CONSTANTS():
                        'month': 2592000, 'months': 2592000, 'm': 2592000, 'M': 2592000, 'year': 31536000, 'years': 31536000, 'y': 31536000, 'Y': 31536000}
 
         MARKET_CAP_CATEGORIES = {'Nano': 50e6, 'Micro': 300e6, 'Small': 2e9, 'Mid': 10e9, 'Large': 200e9, 'Mega': float('inf')}
+        
+        ENTRY_DELAY_CUTOFF_TIMEFRAME = '1h'
 
         WARMUP_MAP = {'1min':'1M', '5min':'3M', '15min':'4M', '1h':'6M', '4h':'1Y', '1D':'2Y', '1W':'5Y', '2min':'2M', '30min':'5M'}
         TIMEFRAMES_STD = ['1min', '5min', '15min', '1h', '4h', '1D', '1W']#list(WARMUP_MAP)
@@ -66,6 +69,7 @@ class CONSTANTS():
         LIVE_ACTIONS = ['fetch', 'enrich', 'execut']
         FETCHER_TYPES = ['ibkr', 'polygon']
         DEFAULT_TIMEFRAME = {'multiplier': 1, 'unit': 'minute'}
+        DIRECTIONS = ['bull', 'bear']
 
         LEVELS_ROUNDING_PRECISION = 2
 

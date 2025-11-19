@@ -14,16 +14,22 @@ class TradingConfig:
         self.sl_pct: float = 0.05               # stop loss: 1%
         self.tp_pct: float = 0.1                # take profit: 2%
         self.max_hold_minuties: int = 120       # max holding period
+
+        # Predictions config
         self.use_model_prediction: bool = True  # use prediction for entry filter or position sizing
         self.pred_th: float = 0.5
-        self.rrr_threshold: float = 1
+
+        # Risk and stop config
+        self.rrr_threshold: float = 0.5
         self.tier_max: int = 5
         self.size = 'auto'
-        self.offset_targets = 10
-        self.profit_ratio = 2
-        self.max_loss_perc = 1
-        self.partial_perc = 10
-        self.default_currency = 'USD'
+        self.offset_targets: int = 10
+        self.profit_ratio: int = 2
+        self.perc_gain: int = 10
+        self.max_time_factor: int = 50
+        self.max_loss_perc: int = 1
+        self.partial_perc: int = 10
+        self.default_currency: str = 'USD'
 
         # ML model config
         self.model_type: str = 'xgboost'
@@ -36,6 +42,11 @@ class TradingConfig:
         self.stop = 'hod'
         self.paper_trading = True
         self.remote_ib = True
+
+        # Features thresholds
+        self.rsi_threshold: int = 75
+        self.cam_M_threshold: int = 3
+        target_factor: float = 10
 
         # Data handling config
         # self.look_backward = '1M'

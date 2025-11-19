@@ -34,8 +34,8 @@ class BacktraderStrategyWrapper(bt.Strategy):
 
     def __init__(self):
         self.manager = self.p.manager
-        self.entry_delay = self.p.entry_delay
         self.active_stop_price = None  # stores fixed stop-loss value for current trade
+        self.reset_active_stop_price = False
         self.total_bars = self.p.total_bars
         self.df = self.p.df
         self.dropped_required_columns = self.p.dropped_required_columns
@@ -168,18 +168,22 @@ class BacktraderStrategyWrapper(bt.Strategy):
         self.display_status_progress()
 
         curr_idx = len(self) - 1
-        decision_idx = curr_idx - self.entry_delay
+        decision_idx = curr_idx - self.manager.entry_delay
         prev_decision_idx = decision_idx - 1
 
         if decision_idx < 0:
             return  # Not enough bars yet
+        
+        if self.reset_active_stop_price:
+            self.active_stop_price = None
+            self.reset_active_stop_price = False
 
         # decision_row = self.build_row(decision_idx)
         # curr_row = self.build_row(curr_idx)
         # prev_decision_row = self.build_row(decision_idx - 1) if decision_idx - 1 >= 0 else decision_row
         curr_row = self.build_row(0)
-        decision_row = self.build_row(self.entry_delay)
-        prev_decision_row = self.build_row(self.entry_delay + 1)
+        decision_row = self.build_row(self.manager.entry_delay)
+        prev_decision_row = self.build_row(self.manager.entry_delay + 1)
 
         # time_test = pd.Timestamp('2024-11-06 11:43:00-0500', tz='US/Eastern')
         # if curr_row['date'] == time_test:
@@ -196,17 +200,18 @@ class BacktraderStrategyWrapper(bt.Strategy):
                 self.quantity = self.manager.evaluate_quantity(self.entry_prediction)
                 self.order = self.execute_order('entry')
 
-                if hasattr(self.manager.strategy_instance.target_handler, 'set_entry_time'):
-                    self.manager.strategy_instance.target_handler.set_entry_time(curr_row['date'])
-                if hasattr(self.manager.strategy_instance.target_handler, 'set_target_price'):
-                    self.manager.strategy_instance.target_handler.set_target_price(row=decision_row)
-
                 # Resolve stop once here
                 self.active_stop_price = self.manager.resolve_stop_price(curr_row, self.active_stop_price)
 
+                # Set target entry time and price
+                if hasattr(self.manager.strategy_instance.target_handler, 'set_entry_time'):
+                    self.manager.strategy_instance.target_handler.set_entry_time(curr_row['date'])
+                if hasattr(self.manager.strategy_instance.target_handler, 'set_target_price'):
+                    self.manager.strategy_instance.target_handler.set_target_price(row=decision_row, stop_price=self.active_stop_price)
+
                 reason2close = self.manager.assess_reason2close(decision_row, prev_decision_row, self.active_stop_price)
                 if reason2close:
-                    self.active_stop_price = None
+                    self.reset_active_stop_price = True # Don't reset active_stop_price directly or log_trade won't get the qctive_stop_price value
         else:
             # Exit logic
             reason2close = self.manager.assess_reason2close(decision_row, prev_decision_row, self.active_stop_price)
@@ -215,7 +220,8 @@ class BacktraderStrategyWrapper(bt.Strategy):
                 self.exit_price = curr_row['close']
                 self.exit_reason = reason2close
                 self.order = self.execute_order('exit')
-                self.active_stop_price = None  # Reset for next trade
+                # self.active_stop_price = None  # Reset for next trade
+                self.reset_active_stop_price = True # Don't reset active_stop_price directly or log_trade won't get the qctive_stop_price value
 
         self.prev_row = curr_row
 
