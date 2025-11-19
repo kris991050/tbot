@@ -54,7 +54,7 @@ if __name__ == "__main__":
     ib_client_id = next((int(arg[7:]) for arg in args if arg.startswith('client=')), 9)
 
     fetcher = LiveScansFetcher(worker_type='scans_fetcher', wait_seconds=wait_seconds, continuous=continuous, ib_client_id=ib_client_id, 
-                               paper_trading=paper_trading, remote_ib=not local_ib)
+                               paper_trading=paper_trading, remote_ib=not local_ib, no_log=True)
     fetcher.run()
 
 

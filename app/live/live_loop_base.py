@@ -11,10 +11,11 @@ import trading_config, live_data_logger
 
 class LiveLoopBase:
     def __init__(self, worker_type:str='', wait_seconds:int=None, continuous:bool=True, single_symbol:str=None, ib_disconnect:bool=False, 
-                 live_mode:str='live', ib_client_id:int=None, config=None, paper_trading:bool=None, remote_ib:bool=None, timezone=None):
+                 live_mode:str='live', ib_client_id:int=None, no_log:bool=False, config=None, paper_trading:bool=None, remote_ib:bool=None, timezone=None):
         self.worker_type = worker_type
         self.live_mode = helpers.set_var_with_constraints(live_mode, CONSTANTS.MODES['live'])
         self.ib_client_id = ib_client_id
+        self.no_log = no_log
         self.config = self._resolve_config(config, locals())
         self.wait_seconds = wait_seconds if wait_seconds else None
         self.continuous = continuous
@@ -66,7 +67,7 @@ class LiveLoopBase:
         # end_time = pd.Timestamp.combine(current_time.date(), CONSTANTS.TH_TIMES['end_of_day']).tz_localize(CONSTANTS.TZ_WORK)
 
         # Create live log file path
-        with logs.LogContext(self.logger.live_log_file_path, overwrite=True): # Logging starts here
+        with logs.LogContext(self.logger.live_log_file_path, overwrite=True, no_log=self.no_log): # Logging starts here
 
             # while start_time <= current_time < end_time:
             now = helpers.calculate_now(sim_offset=self.config.sim_offset, tz=self.config.timezone)

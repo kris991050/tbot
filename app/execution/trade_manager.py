@@ -28,7 +28,7 @@ def get_strategy_instance(strategy_name:str, config:trading_config.TradingConfig
                 return sr_bounce_strategy.SRBounceStrategy(direction=direction, timeframe=Timeframe(tf), cam_M_threshold=config.cam_M_threshold, 
                                                            revised=config.revised, target_factor=config.perc_gain, 
                                                            max_time_factor=config.max_time_factor)
-        for tf in ['5min', '15min', '1h', '4h']:
+        for tf in ['5min', '15min']:
             if f'breakout_{tf}_{direction}' in strategy_name:
                 return breakout_strategy.BreakoutStrategy(direction=direction, timeframe=Timeframe(tf), 
                                                            revised=config.revised, target_factor=config.perc_gain, 

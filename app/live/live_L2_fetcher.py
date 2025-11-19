@@ -73,7 +73,7 @@ if __name__ == "__main__":
     ib_client_id = next((int(arg[7:]) for arg in args if arg.startswith('client=')), 10)
 
     fetcher = LiveL2Fetcher(worker_type='L2_fetcher', wait_seconds=wait_seconds, continuous=continuous, single_symbol=single_symbol, 
-                            ib_disconnect=True, ib_client_id=ib_client_id, paper_trading=paper_trading, remote_ib=not local_ib)
+                            ib_disconnect=True, ib_client_id=ib_client_id, paper_trading=paper_trading, remote_ib=not local_ib, no_log=True)
     fetcher.run()
 
 # def get_symbols(folder=helpers.get_path_daily_data_folder()):

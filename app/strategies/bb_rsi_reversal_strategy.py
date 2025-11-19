@@ -4,6 +4,7 @@ parent_folder = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_folder)
 
 from utils import helpers
+from utils.constants import CONSTANTS
 from utils.timeframe import Timeframe
 from strategies import base_strategy
 from strategies import target_handler
