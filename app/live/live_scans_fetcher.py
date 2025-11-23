@@ -5,7 +5,10 @@ sys.path.append(parent_folder)
 
 from miscellaneous import scanner
 import live_loop_base
-from utils import helpers, constants
+from utils import helpers
+from utils.constants import PATHS
+from utils.timeframe import Timeframe
+from strategies import bb_rsi_reversal_strategy
 
 
 class LiveScansFetcher(live_loop_base.LiveLoopBase):
@@ -17,12 +20,12 @@ class LiveScansFetcher(live_loop_base.LiveLoopBase):
         print('\n======== FETCHING GAPPERS UP ========\n')
         symbols_up, df_up = scanner.scannerTradingView("GapperUp")
         print(helpers.df_to_table(df_up.round(2)))
-        helpers.save_to_daily_csv(self.ib, symbols_up, constants.PATHS.daily_csv_files['gapper_up'])
+        helpers.save_to_daily_csv(self.ib, symbols_up, PATHS.daily_csv_files['gapper_up'])
 
         print('\n======== FETCHING GAPPERS DOWN ========\n')
         symbols_down, df_down = scanner.scannerTradingView("GapperDown")
         print(helpers.df_to_table(df_down.round(2)))
-        helpers.save_to_daily_csv(self.ib, symbols_down, constants.PATHS.daily_csv_files['gapper_down'])
+        helpers.save_to_daily_csv(self.ib, symbols_down, PATHS.daily_csv_files['gapper_down'])
 
     def _scan_earnings(self):
         now = helpers.calculate_now(sim_offset=self.config.sim_offset, tz=self.config.timezone)
@@ -31,12 +34,13 @@ class LiveScansFetcher(live_loop_base.LiveLoopBase):
         print('\n======== FETCHING RECENT EARNINGS ========\n')
         symbols, _ = scanner.scannerFinviz("RE")
         print(symbols)
-        helpers.save_to_daily_csv(self.ib, symbols, constants.PATHS.daily_csv_files['earnings'])
+        helpers.save_to_daily_csv(self.ib, symbols, PATHS.daily_csv_files['earnings'])
 
     def _scan_bb_rsi_reversal(self):
-        symbols = self.manager.scan_bb_rsi_reversal()
+        now = helpers.calculate_now(sim_offset=self.config.sim_offset, tz=self.config.timezone)
+        symbols = bb_rsi_reversal_strategy.BBRSIReversalStrategy(direction='bull', timeframe=Timeframe()).scanner_func(now=now, timezone=self.config.timezone)
         print(symbols)
-        helpers.save_to_daily_csv(self.ib, symbols, constants.PATHS.daily_csv_files['bb_rsi_reversal'])
+        helpers.save_to_daily_csv(self.ib, symbols, PATHS.daily_csv_files['bb_rsi_reversal'])
     
     def _execute_main_task(self):
         self._scan_gappers()

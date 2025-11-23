@@ -72,7 +72,7 @@ class LiveLoopBase:
             # while start_time <= current_time < end_time:
             now = helpers.calculate_now(sim_offset=self.config.sim_offset, tz=self.config.timezone)
             print(f"🕰️ Time now: {now}    |   Sim offset: {self.config.sim_offset}")
-            while helpers.is_between_market_times('pre-market', 'end_of_day', now=now, timezone=self.config.timezone):
+            while True:#helpers.is_between_market_times('pre-market', 'end_of_day', now=now, timezone=self.config.timezone):
 
                 self._connect_ib()
 

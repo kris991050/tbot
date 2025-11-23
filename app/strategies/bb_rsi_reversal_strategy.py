@@ -4,17 +4,19 @@ parent_folder = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_folder)
 
 from utils import helpers
-from utils.constants import CONSTANTS
+from utils.constants import CONSTANTS, PATHS
 from utils.timeframe import Timeframe
 from strategies import base_strategy
 from strategies import target_handler
+from miscellaneous import scanner
 
 
 class BBRSIReversalStrategy(base_strategy.BaseStrategy):
 
     def __init__(self, direction:str, timeframe:Timeframe, rsi_threshold:int=75, cam_M_threshold:int=4, revised:bool=False):
 
-        super().__init__(name=f'bb_rsi_reversal_{timeframe}_{direction}', description=f'{direction}ish BB_RSI_Reversal signal using RSI and BB from higher timeframes')
+        self.base_name = 'bb_rsi_reversal'
+        super().__init__(name=f'{self.base_name}_{timeframe}_{direction}', description=f'{direction}ish BB_RSI_Reversal signal using RSI and BB from higher timeframes')
         self.direction = helpers.set_var_with_constraints(direction, CONSTANTS.DIRECTIONS)
         # self.timeframe_min = timeframe_min
         # self.timeframe = f"{timeframe_min}min" if timeframe_min == 1 else f"{timeframe_min}mins" if timeframe_min > 1 else None
@@ -43,6 +45,8 @@ class BBRSIReversalStrategy(base_strategy.BaseStrategy):
         self.stop_handler = None
         self.required_columns = self._build_required_columns()
         self.required_features = {'indicators': ['momentum', 'volatility'], 'levels': ['monthly'], 'patterns': [], 'sr': False}
+        self.scanner_data_file_name = PATHS.daily_csv_files[self.base_name]
+        self.scanner_func = self._scan_bb_rsi_reversal
 
     def _build_required_columns(self):
         common_req_cols = [f'rsi_{tf}' for tf in self.timeframes] + ['cam_M_position']#, 'market_cap_cat']
@@ -86,9 +90,11 @@ class BBRSIReversalStrategy(base_strategy.BaseStrategy):
 
     def evaluate_trigger(self, row):
         if self.direction.lower() == 'bull':
-            trigger =  bb_rsi_trigger_bull(row, self.timeframes, rsi_threshold=self.rsi_threshold, cam_M_threshold=self.cam_M_threshold, revised=self.revised)
+            # trigger =  bb_rsi_trigger_bull(row, self.timeframes, rsi_threshold=self.rsi_threshold, cam_M_threshold=self.cam_M_threshold, revised=self.revised)
+            trigger =  self._bb_rsi_trigger_bull(row)
         elif self.direction.lower() == 'bear':
-            trigger = bb_rsi_trigger_bear(row, self.timeframes, rsi_threshold=self.rsi_threshold, cam_M_threshold=self.cam_M_threshold, revised=self.revised)
+            # trigger = bb_rsi_trigger_bear(row, self.timeframes, rsi_threshold=self.rsi_threshold, cam_M_threshold=self.cam_M_threshold, revised=self.revised)
+            trigger = self._bb_rsi_trigger_bear(row)
         else:
             trigger = None
         if trigger is None:
@@ -97,9 +103,10 @@ class BBRSIReversalStrategy(base_strategy.BaseStrategy):
 
     def evaluate_discard(self, row):
         if self.direction.lower() == 'bull':
-            return bb_rsi_discard_bull(row, self.timeframes, rsi_threshold=self.rsi_threshold)
+            # return bb_rsi_discard_bull(row, self.timeframes, rsi_threshold=self.rsi_threshold)
+            return self._bb_rsi_discard_bull(row)
         elif self.direction.lower() == 'bear':
-            return bb_rsi_discard_bear(row, self.timeframes, rsi_threshold=self.rsi_threshold)
+            return self._bb_rsi_discard_bear(row)
         else:
             return None
 
@@ -115,108 +122,161 @@ class BBRSIReversalStrategy(base_strategy.BaseStrategy):
         # df[self.trigger_columns[0]] = df.apply(lambda row: self.evaluate_trigger(row, row_tr), axis=1)
 
         return df#.copy()
+    
+    def _bb_rsi_trigger_bull(self, row):
+        rsi_conditions = [row[f'rsi_{tf}'] < (100 - self.rsi_threshold) for tf in self.timeframes]
+        bband_conditions = [row[f'bband_l_{tf}'] > row['close'] for tf in self.timeframes[1:]]
+        cam_condition = row['cam_M_position'] < -self.cam_M_threshold
 
-def bb_rsi_trigger_bull(row, timeframes, rsi_threshold, cam_M_threshold, revised=False):
-    rsi_conditions = [row[f'rsi_{tf}'] < (100 - rsi_threshold) for tf in timeframes]
-    bband_conditions = [row[f'bband_l_{tf}'] > row['close'] for tf in timeframes[1:]]
-    cam_condition = row['cam_M_position'] < -cam_M_threshold
+        base_trigger = (all(rsi_conditions) and all(bband_conditions) and cam_condition)
 
-    base_trigger = (all(rsi_conditions) and all(bband_conditions) and cam_condition)
+        if not self.revised:
+            return base_trigger
 
-    # if timeframe_min in [1, 2]: timeframe_specific_cond = (row['rsi_5min'] < (100 - rsi_threshold) and row['bband_l_5min'] > row['close'])
-    # elif timeframe_min == 5: timeframe_specific_cond = (row['rsi_4h'] < (100 - rsi_threshold) and row['bband_l_4h'] > row['close'])
-    # base_trigger = (
-    #     timeframe_specific_cond and
-    #     row['rsi'] < (100 - rsi_threshold) and
-    #     row['rsi_15min'] < (100 - rsi_threshold) and
-    #     row['rsi_1h'] < (100 - rsi_threshold) and
-    #     row['bband_l_15min'] > row['close'] and
-    #     row['bband_l_1h'] > row['close'] and
-    #     row['cam_M_position'] < -cam_M_threshold
-    #     # row.get('cam_M_position', row.get('cam_M', 0)) < -cam_M_threshold
-    # )
+        if len(row) == 1: row = row.iloc[0]
+        revised_trigger = (
+            (row['rsi_slope_1D'] <= -4.085 and row['rsi_1D'] > 35.715 and row['rsi_slope_1h'] <= -0.21) or
+            (row['rsi_slope_1D'] > -4.085 and row['bband_width_ratio_1D'] <= 0.98 and row['bband_l_1D_pct_diff'] <= 0.0276)
+        )
+        return base_trigger and revised_trigger
 
-    if not revised:
-        return base_trigger
+    def _bb_rsi_discard_bull(self, row):
+        discard_conditions = [row[f'rsi_{tf}'] > (100 - self.rsi_threshold) for tf in self.timeframes[2:]]
+        return all(discard_conditions)
 
-    # row_tr, _ = features_processor.apply_feature_transformations(row)
-    if len(row) == 1: row = row.iloc[0]
-    revised_trigger = (
-        (row['rsi_slope_1D'] <= -4.085 and row['rsi_1D'] > 35.715 and row['rsi_slope_1h'] <= -0.21) or
-        (row['rsi_slope_1D'] > -4.085 and row['bband_width_ratio_1D'] <= 0.98 and row['bband_l_1D_pct_diff'] <= 0.0276)
-    )
-    # revised_trigger = (
-    #     (row['rsi_slope_1D'] < 2 and row['levels_dist_to_next_up_pct'] < 0.008) or
-    #     (row['rsi_slope_1D'] < 2 and row['levels_dist_to_next_up_pct'] > 0.008 and row['market_cap_cat'] < 4.5) or
-    #     (row['rsi_slope_1D'] > 2 and row['bband_h_1D_dist_pct_atr'] > 2.8 and row['bband_l_1D_dist_pct_atr'] < 42)
+    def _bb_rsi_trigger_bear(self, row):
+        rsi_conditions = [row[f'rsi_{tf}'] > self.rsi_threshold for tf in self.timeframes]
+        bband_conditions = [row[f'bband_h_{tf}'] < row['close'] for tf in self.timeframes[1:]]
+        cam_condition = row['cam_M_position'] > self.cam_M_threshold
 
-        # (row['rsi_1D'] < 28 and 5 < row['pivots_M_dist_to_next_up'] < 7.5) or
-        # (row['rsi_1D'] > 28 and row['pivots_M_dist_to_next_up'] < 2.5 and row['atr_D'] < 4) or
-        # (row['rsi_1D'] > 28 and row['pivots_M_dist_to_next_up'] > 2.5 and row['avg_volume'] < 240000)
-    # )
+        base_trigger = (all(rsi_conditions) and all(bband_conditions) and cam_condition)
 
-    return base_trigger and revised_trigger
+        if not self.revised:
+            return base_trigger
 
+        if len(row) == 1: row = row.iloc[0]
 
-def bb_rsi_discard_bull(row, timeframes, rsi_threshold):
-    discard_conditions = [row[f'rsi_{tf}'] > (100 - rsi_threshold) for tf in timeframes[2:]]
-    return all(discard_conditions)
-    # if timeframe_min == 1 or timeframe_min == 2:
-    #     return (row['rsi_15min'] > (100 - rsi_threshold) or row['rsi_1h'] > (100 - rsi_threshold))
-    # elif timeframe_min == 5:
-    #     return (row['rsi_1h'] > (100 - rsi_threshold) or row['rsi_4h'] > (100 - rsi_threshold))
-    # else: return True
+        revised_trigger = (
+            (row['rsi_slope_1D'] <= 4.625 and row['rsi_slope_1D'] <= 1.92 and row['levels_dist_to_next_up_pct'] <= 0.0087) or
+            (row['rsi_slope_1D'] <= 4.625 and row['rsi_slope_1D'] > 1.92 and row['bband_h_1h_pct_diff'] > 0.0069) or
+            (row['rsi_slope_1D'] > 4.625 and row['bband_h_1D_pct_diff'] > 0.0227 and row['breakout_down_since_last_1min'] > 871.0)
+        )
+        return base_trigger and revised_trigger
 
-
-def bb_rsi_trigger_bear(row, timeframes, rsi_threshold, cam_M_threshold, revised=False):
-    rsi_conditions = [row[f'rsi_{tf}'] > rsi_threshold for tf in timeframes]
-    bband_conditions = [row[f'bband_h_{tf}'] < row['close'] for tf in timeframes[1:]]
-    cam_condition = row['cam_M_position'] > cam_M_threshold
-
-    base_trigger = (all(rsi_conditions) and all(bband_conditions) and cam_condition)
-
-    # if timeframe_min in [1, 2]: timeframe_specific_cond = (row['rsi_5min'] > (rsi_threshold) and row['bband_h_5min'] < row['close'])
-    # elif timeframe_min == 5: timeframe_specific_cond = (row['rsi_4h'] > (rsi_threshold) and row['bband_h_4h'] > row['close'])
-    # base_trigger = (
-    #     timeframe_specific_cond and
-    #     row['rsi'] > (rsi_threshold) and
-    #     row['rsi_15min'] > (rsi_threshold) and
-    #     row['rsi_1h'] > (rsi_threshold) and
-    #     row['bband_h_15min'] < row['close'] and
-    #     row['bband_h_1h'] < row['close'] and
-    #     row['cam_M_position'] > cam_M_threshold
-    #     # row.get('cam_M_position', row.get('cam_M', 0)) > cam_M_threshold
-    # )
-
-    if not revised:
-        return base_trigger
-
-    # row_tr, _ = features_processor.apply_feature_transformations(row)
-    if len(row) == 1: row = row.iloc[0]
-    # revised_trigger = (
-    #     (row['rsi_1D'] < 71.5 and row['hammer_up_since_last'] > 33.5) or
-    #     (row['rsi_1D'] > 71.5 and row['sr_1h_dist_to_next_down'] < 0.0065) or
-    #     (row['rsi_1D'] > 71.5 and row['sr_1h_dist_to_next_down'] > 0.0065 and row['avg_volume'] < 243)
-    # )
-
-    # revised_trigger = row_tr.apply(evaluate_trigger, axis=1)
-    revised_trigger = (
-        (row['rsi_slope_1D'] <= 4.625 and row['rsi_slope_1D'] <= 1.92 and row['levels_dist_to_next_up_pct'] <= 0.0087) or
-        (row['rsi_slope_1D'] <= 4.625 and row['rsi_slope_1D'] > 1.92 and row['bband_h_1h_pct_diff'] > 0.0069) or
-        (row['rsi_slope_1D'] > 4.625 and row['bband_h_1D_pct_diff'] > 0.0227 and row['breakout_down_since_last_1min'] > 871.0)
-    )
-
-    return base_trigger and revised_trigger
+    def _bb_rsi_discard_bear(self, row):
+        discard_conditions = [row[f'rsi_{tf}'] < self.rsi_threshold for tf in self.timeframes[2:]]
+        return all(discard_conditions)
+    
+    @staticmethod
+    def _scan_bb_rsi_reversal(now, timezone=CONSTANTS.TZ_WORK):
+        # if not helpers.is_between_market_times('pre-market', 'end_of_tday', now=now, timezone=timezone):
+        #     return []
+        print('\n======== FETCHING RSI REVERSALS ========\n')
+        symbols, _ = scanner.scannerTradingView("RSI-Reversal")
+        return symbols
 
 
-def bb_rsi_discard_bear(row, timeframes, rsi_threshold):
-    discard_conditions = [row[f'rsi_{tf}'] < rsi_threshold for tf in timeframes[2:]]
-    return all(discard_conditions)
-    # if timeframe_min == 1 or timeframe_min == 2:
-    #     return (row['rsi_15min'] < rsi_threshold or row['rsi_1h'] < rsi_threshold)
-    # elif timeframe_min == 5:
-    #     return (row['rsi_1h'] < rsi_threshold or row['rsi_4h'] < rsi_threshold)
-    # else: return True
+# def bb_rsi_trigger_bull(row, timeframes, rsi_threshold, cam_M_threshold, revised=False):
+#     rsi_conditions = [row[f'rsi_{tf}'] < (100 - rsi_threshold) for tf in timeframes]
+#     bband_conditions = [row[f'bband_l_{tf}'] > row['close'] for tf in timeframes[1:]]
+#     cam_condition = row['cam_M_position'] < -cam_M_threshold
+
+#     base_trigger = (all(rsi_conditions) and all(bband_conditions) and cam_condition)
+
+#     # if timeframe_min in [1, 2]: timeframe_specific_cond = (row['rsi_5min'] < (100 - rsi_threshold) and row['bband_l_5min'] > row['close'])
+#     # elif timeframe_min == 5: timeframe_specific_cond = (row['rsi_4h'] < (100 - rsi_threshold) and row['bband_l_4h'] > row['close'])
+#     # base_trigger = (
+#     #     timeframe_specific_cond and
+#     #     row['rsi'] < (100 - rsi_threshold) and
+#     #     row['rsi_15min'] < (100 - rsi_threshold) and
+#     #     row['rsi_1h'] < (100 - rsi_threshold) and
+#     #     row['bband_l_15min'] > row['close'] and
+#     #     row['bband_l_1h'] > row['close'] and
+#     #     row['cam_M_position'] < -cam_M_threshold
+#     #     # row.get('cam_M_position', row.get('cam_M', 0)) < -cam_M_threshold
+#     # )
+
+#     if not revised:
+#         return base_trigger
+
+#     # row_tr, _ = features_processor.apply_feature_transformations(row)
+#     if len(row) == 1: row = row.iloc[0]
+#     revised_trigger = (
+#         (row['rsi_slope_1D'] <= -4.085 and row['rsi_1D'] > 35.715 and row['rsi_slope_1h'] <= -0.21) or
+#         (row['rsi_slope_1D'] > -4.085 and row['bband_width_ratio_1D'] <= 0.98 and row['bband_l_1D_pct_diff'] <= 0.0276)
+#     )
+#     # revised_trigger = (
+#     #     (row['rsi_slope_1D'] < 2 and row['levels_dist_to_next_up_pct'] < 0.008) or
+#     #     (row['rsi_slope_1D'] < 2 and row['levels_dist_to_next_up_pct'] > 0.008 and row['market_cap_cat'] < 4.5) or
+#     #     (row['rsi_slope_1D'] > 2 and row['bband_h_1D_dist_pct_atr'] > 2.8 and row['bband_l_1D_dist_pct_atr'] < 42)
+
+#         # (row['rsi_1D'] < 28 and 5 < row['pivots_M_dist_to_next_up'] < 7.5) or
+#         # (row['rsi_1D'] > 28 and row['pivots_M_dist_to_next_up'] < 2.5 and row['atr_D'] < 4) or
+#         # (row['rsi_1D'] > 28 and row['pivots_M_dist_to_next_up'] > 2.5 and row['avg_volume'] < 240000)
+#     # )
+
+#     return base_trigger and revised_trigger
+
+
+# def bb_rsi_discard_bull(row, timeframes, rsi_threshold):
+#     discard_conditions = [row[f'rsi_{tf}'] > (100 - rsi_threshold) for tf in timeframes[2:]]
+#     return all(discard_conditions)
+#     # if timeframe_min == 1 or timeframe_min == 2:
+#     #     return (row['rsi_15min'] > (100 - rsi_threshold) or row['rsi_1h'] > (100 - rsi_threshold))
+#     # elif timeframe_min == 5:
+#     #     return (row['rsi_1h'] > (100 - rsi_threshold) or row['rsi_4h'] > (100 - rsi_threshold))
+#     # else: return True
+
+
+# def bb_rsi_trigger_bear(row, timeframes, rsi_threshold, cam_M_threshold, revised=False):
+#     rsi_conditions = [row[f'rsi_{tf}'] > rsi_threshold for tf in timeframes]
+#     bband_conditions = [row[f'bband_h_{tf}'] < row['close'] for tf in timeframes[1:]]
+#     cam_condition = row['cam_M_position'] > cam_M_threshold
+
+#     base_trigger = (all(rsi_conditions) and all(bband_conditions) and cam_condition)
+
+#     # if timeframe_min in [1, 2]: timeframe_specific_cond = (row['rsi_5min'] > (rsi_threshold) and row['bband_h_5min'] < row['close'])
+#     # elif timeframe_min == 5: timeframe_specific_cond = (row['rsi_4h'] > (rsi_threshold) and row['bband_h_4h'] > row['close'])
+#     # base_trigger = (
+#     #     timeframe_specific_cond and
+#     #     row['rsi'] > (rsi_threshold) and
+#     #     row['rsi_15min'] > (rsi_threshold) and
+#     #     row['rsi_1h'] > (rsi_threshold) and
+#     #     row['bband_h_15min'] < row['close'] and
+#     #     row['bband_h_1h'] < row['close'] and
+#     #     row['cam_M_position'] > cam_M_threshold
+#     #     # row.get('cam_M_position', row.get('cam_M', 0)) > cam_M_threshold
+#     # )
+
+#     if not revised:
+#         return base_trigger
+
+#     # row_tr, _ = features_processor.apply_feature_transformations(row)
+#     if len(row) == 1: row = row.iloc[0]
+#     # revised_trigger = (
+#     #     (row['rsi_1D'] < 71.5 and row['hammer_up_since_last'] > 33.5) or
+#     #     (row['rsi_1D'] > 71.5 and row['sr_1h_dist_to_next_down'] < 0.0065) or
+#     #     (row['rsi_1D'] > 71.5 and row['sr_1h_dist_to_next_down'] > 0.0065 and row['avg_volume'] < 243)
+#     # )
+
+#     # revised_trigger = row_tr.apply(evaluate_trigger, axis=1)
+#     revised_trigger = (
+#         (row['rsi_slope_1D'] <= 4.625 and row['rsi_slope_1D'] <= 1.92 and row['levels_dist_to_next_up_pct'] <= 0.0087) or
+#         (row['rsi_slope_1D'] <= 4.625 and row['rsi_slope_1D'] > 1.92 and row['bband_h_1h_pct_diff'] > 0.0069) or
+#         (row['rsi_slope_1D'] > 4.625 and row['bband_h_1D_pct_diff'] > 0.0227 and row['breakout_down_since_last_1min'] > 871.0)
+#     )
+
+#     return base_trigger and revised_trigger
+
+
+# def bb_rsi_discard_bear(row, timeframes, rsi_threshold):
+#     discard_conditions = [row[f'rsi_{tf}'] < rsi_threshold for tf in timeframes[2:]]
+#     return all(discard_conditions)
+#     # if timeframe_min == 1 or timeframe_min == 2:
+#     #     return (row['rsi_15min'] < rsi_threshold or row['rsi_1h'] < rsi_threshold)
+#     # elif timeframe_min == 5:
+#     #     return (row['rsi_1h'] < rsi_threshold or row['rsi_4h'] < rsi_threshold)
+#     # else: return True
 
 
 class BBRSIReversalStrategy_1(BBRSIReversalStrategy):

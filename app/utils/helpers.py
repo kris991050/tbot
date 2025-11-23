@@ -773,14 +773,13 @@ def get_tick_value(price):
      return  10 ** -int(str(price)[::-1].find('.'))
 
 
-def get_symbol_seed_list(seed: int, base_folder=PATHS.folders_path['market_data']):
+def get_symbol_seed_list(seed:int, base_folder=PATHS.folders_path['market_data']):
     stock_list_file = os.path.join(base_folder, f"stock_list_seed{seed}.csv")
     if not os.path.exists(stock_list_file):
         return []
 
     df = load_df_from_file(stock_list_file)
     return sorted(df['symbol'].to_list())
-
 
 
 def get_stock_info_from_Finviz(symbol, field):

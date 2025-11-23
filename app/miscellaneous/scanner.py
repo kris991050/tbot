@@ -2,7 +2,8 @@ import sys, requests, pandas as pd
 from bs4 import BeautifulSoup
 from tradingview_screener import Query, Column
 from playwright.sync_api import sync_playwright
-from utils import helpers, constants
+from utils import helpers
+from utils.constants import CONSTANTS, PATHS
 # from selenium import webdriver
 # from selenium.webdriver.chrome.service import Service as ChromeService
 # from webdriver_manager.chrome import ChromeDriverManager
@@ -68,7 +69,7 @@ def scannerIBKR(ib):
     #        https://interactivebrokers.github.io/tws-api/market_scanners.html
 
     sub = ScannerSubscription(instrument='STK', locationCode='STK.US.MAJOR', scanCode='TOP_PERC_GAIN')#scanCode='MOST_ACTIVE')
-    ib.sleep(constants.CONSTANTS.PROCESS_TIME['long'])
+    ib.sleep(CONSTANTS.PROCESS_TIME['long'])
     tagValues = [TagValue('priceAbove', 5), TagValue("volumeAbove", 500)]
     tagValues = [TagValue("changePercAbove", "5"),
                  TagValue('priceAbove', 5),#, TagValue('priceBelow', 50),
@@ -491,7 +492,7 @@ if __name__ == "__main__":
         if force: symbolsTT.append(force)
         print("\nSymbols from Trading Terminal scanner =\n")
         print(symbolsTT)
-        if record: helpers.save_to_daily_csv(ib, symbolsTT, constants.PATHS.daily_csv_files['gapper_up'])
+        if record: helpers.save_to_daily_csv(ib, symbolsTT, PATHS.daily_csv_files['gapper_up'])
 
     elif scanner_type == 'tv_rsi_reversal':
 
@@ -501,7 +502,7 @@ if __name__ == "__main__":
         print("\nSymbols from TradingView scanner RSI_Reversal=\n")
         print(symbolsTV)
         print(symbolsTV_no15)
-        if record: helpers.save_to_daily_csv(ib, symbolsTV_no15, constants.PATHS.daily_csv_files['rsi-reversal'])
+        if record: helpers.save_to_daily_csv(ib, symbolsTV_no15, PATHS.daily_csv_files['rsi-reversal'])
 
     elif scanner_type == 'tv_gapper_up':
 
@@ -517,7 +518,7 @@ if __name__ == "__main__":
 
         print("\nSymbols from TradingView scanner GapperUp=\n")
         print(symbolsTV)
-        if record: helpers.save_to_daily_csv(ib, symbolsTV, constants.PATHS.daily_csv_files['gapper_up'])
+        if record: helpers.save_to_daily_csv(ib, symbolsTV, PATHS.daily_csv_files['gapper_up'])
 
     elif scanner_type == 'tv_gapper_down':
 
@@ -529,7 +530,7 @@ if __name__ == "__main__":
 
         print("\nSymbols from TradingView scanner GapperDown=\n")
         print(symbolsTV)
-        if record: helpers.save_to_daily_csv(ib, symbolsTV, constants.PATHS.daily_csv_files['gapper_down'])
+        if record: helpers.save_to_daily_csv(ib, symbolsTV, PATHS.daily_csv_files['gapper_down'])
 
     elif scanner_type == 'earnings':
         # symbolsTV, dfTV = scannerTradingView("Earnings")
@@ -542,7 +543,7 @@ if __name__ == "__main__":
         if force: symbolsFinviz.append(force)
         print("\nSymbols from Finviz scanner =\n")
         print(symbolsFinviz)
-        if record: helpers.save_to_daily_csv(ib, symbolsFinviz, constants.PATHS.daily_csv_files['earnings'])
+        if record: helpers.save_to_daily_csv(ib, symbolsFinviz, PATHS.daily_csv_files['earnings'])
 
     else:
         # symbolsFinviz = scannerFinviz("C5")
@@ -608,7 +609,7 @@ if __name__ == "__main__":
 #             if force: symbolsTT.append(force)
 #             print("\nSymbols from Trading Terminal scanner =\n")
 #             print(symbolsTT)
-#             if record: helpers.save_to_daily_csv(ib, symbolsTT, constants.PATHS.daily_csv_files['gapper_up'])
+#             if record: helpers.save_to_daily_csv(ib, symbolsTT, PATHS.daily_csv_files['gapper_up'])
 
 #         elif scanner_type == 'tv_rsi_reversal':
 
@@ -618,7 +619,7 @@ if __name__ == "__main__":
 #             print("\nSymbols from TradingView scanner RSI_Reversal=\n")
 #             print(symbolsTV)
 #             print(symbolsTV_no15)
-#             if record: helpers.save_to_daily_csv(ib, symbolsTV_no15, constants.PATHS.daily_csv_files['rsi-reversal'])
+#             if record: helpers.save_to_daily_csv(ib, symbolsTV_no15, PATHS.daily_csv_files['rsi-reversal'])
 
 #         elif scanner_type == 'tv_gapper_up':
 
@@ -634,7 +635,7 @@ if __name__ == "__main__":
 
 #             print("\nSymbols from TradingView scanner GapperUp=\n")
 #             print(symbolsTV)
-#             if record: helpers.save_to_daily_csv(ib, symbolsTV, constants.PATHS.daily_csv_files['gapper_up'])
+#             if record: helpers.save_to_daily_csv(ib, symbolsTV, PATHS.daily_csv_files['gapper_up'])
 
 #         else:
 #             symbolsFinviz = scannerFinviz("C5")

@@ -6,9 +6,9 @@ class DualLogger:
         os.makedirs(os.path.dirname(log_path), exist_ok=True)
         self.terminal = sys.stdout
         mode = 'w' if overwrite else 'a'
-        if not no_log: self.log_file = open(log_path, mode, buffering=1, encoding='utf-8')  # Line-buffered
-        sys.stdout = self  # redirect stdout
         self.no_log = no_log
+        if not self.no_log: self.log_file = open(log_path, mode, buffering=1, encoding='utf-8')  # Line-buffered
+        sys.stdout = self  # redirect stdout
 
     def write(self, message, no_log=False):
         no_log = no_log or self.no_log # Option to prevent log to logfile both locally and globally (from LogContext)
@@ -18,11 +18,11 @@ class DualLogger:
 
     def flush(self):
         self.terminal.flush()
-        self.log_file.flush()
+        if not self.no_log: self.log_file.flush()
 
     def close(self):
         sys.stdout = self.terminal
-        self.log_file.close()
+        if not self.no_log: self.log_file.close()
 
 
 class LogContext:

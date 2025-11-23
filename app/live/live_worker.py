@@ -102,13 +102,19 @@ class LiveWorker(live_loop_base.LiveLoopBase):
             if entry_condition:
                 print(f"Executing Order for {symbol}")
                 stop_price = self.manager.resolve_stop_price(last_row)
-                target_price = last_row[self.manager.strategy_instance.params['target_indicator']] if self.manager.strategy_instance.params['target_indicator'] else ''
+                # target_price = last_row[self.manager.strategy_instance.params['target_indicator']] if self.manager.strategy_instance.params['target_indicator'] else ''
+                # Set target entry time and price
+                self.manager.set_target_for_entry(row=last_row, stop_price=stop_price, symbol=symbol)
+                target_price = self.manager.strategy_instance.target_handler.target_price
                 quantity = self.manager.evaluate_quantity(last_row['model_prediction'])
                 # values = self._create_trade_params(symbol, stop_price, target_price, quantity)
+                open_position = orders.get_positions_by_symbol(self.ib, symbol)
+
                 oorder = trade_executor.OOrder(symbol=symbol, stop_loss=stop_price, take_profit=target_price, quantity=quantity, config=self.config)
-                
-                order, TPSL_order = self.executor.execute_order(self.manager.direction, oorder)
-                self.ib.sleep(CONSTANTS.PROCESS_TIME['long'])
+                if not open_position:
+                    order, TPSL_order = self.executor.execute_order(self.manager.direction, oorder)
+                    self.ib.sleep(CONSTANTS.PROCESS_TIME['long'])
+
                 if order is not None and hasattr(order, 'orderStatus'):
                     print(f"Order placed with status {order.orderStatus.status}")
                     # print(TPSL_order.orderStatus.status)

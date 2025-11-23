@@ -14,7 +14,8 @@ class SRBounceStrategy(base_strategy.BaseStrategy):
     def __init__(self, direction:str, timeframe:Timeframe, sr_timeframes:list=['1D', '1W'], cam_M_threshold:int=3, revised:bool=False, 
                  target_factor:float=5, max_time_factor:int=50):
 
-        super().__init__(name=f'sr_bounce_{timeframe}_{direction}', description=f'{direction}ish SR_Bounce signal using S/R levels and Camarilla Pivots')
+        self.base_name = 'sr_bounce'
+        super().__init__(name=f'{self.base_name}_{timeframe}_{direction}', description=f'{direction}ish SR_Bounce signal using S/R levels and Camarilla Pivots')
         self.direction = helpers.set_var_with_constraints(direction, CONSTANTS.DIRECTIONS)
         self.timeframe = timeframe
         self.sr_timeframes = indicators.IndicatorsUtils.resolve_sr_timeframes(self.timeframe, sr_timeframes)
@@ -101,7 +102,7 @@ def sr_bounce_trigger_bull(row, timeframe, sr_timeframes, cam_M_threshold, revis
     return base_trigger and revised_trigger
 
 def sr_bounce_discard_bull():
-    discard_conditions = False
+    discard_conditions = [False]
     return all(discard_conditions)
 
 def sr_bounce_trigger_bear(row, timeframe, sr_timeframes, cam_M_threshold, revised=False):
@@ -119,5 +120,5 @@ def sr_bounce_trigger_bear(row, timeframe, sr_timeframes, cam_M_threshold, revis
 
 
 def sr_bounce_discard_bear():
-    discard_conditions = False
+    discard_conditions = [False]
     return all(discard_conditions)

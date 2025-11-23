@@ -82,7 +82,9 @@ if __name__ == "__main__":
     if 'bb_rsi_reversal' in strategy:
 
         mtf = None
-        strategy_func = trade_manager.get_strategy_instance(strategy_name=strategy, revised=revised, rsi_threshold=75, cam_M_threshold=4)
+        config = trading_config.TradingConfig()
+        config.cam_M_threshold = 4
+        strategy_func = trade_manager.get_strategy_instance(strategy_name=strategy, config=config)
         config = [{'timeframe': strategy_func.timeframe, 'targets': [strategy_func.target_handler], 'mtf': mtf}]
     
     if 'sr_bounce' in strategy:

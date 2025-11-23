@@ -18,13 +18,15 @@ import live_data_logger, process_launcher, trading_config
 #         self.sim_offset = datetime.datetime.now(self.tz) - self.sim_start if self.mode == 'sim' else datetime.timedelta(0) if self.mode == 'live' else None
 
 class LiveOrchestrator:
-    def __init__(self, ib, max_fetchers:int=2, max_enrichers:int=2, strategy_name:str=None, stop=None, step_duration:str=None, revised:bool=None, 
+    def __init__(self, ib, max_fetchers:int=2, max_enrichers:int=2, seed:int=None, strategy_name:str=None, stop=None, step_duration:str=None, revised:bool=None, 
                  live_mode:str='live', paper_trading:bool=None, remote_ib:bool=None, timezone=None):
     # def __init__(self, ib, strategy_name:str, stop, target:str=None, timeframe:str=None, look_backward:str='1M', step_duration:str='1W', revised:bool=False, 
     #              max_fetchers:int=2, max_enrichers:int=2, mode:str='live', paper_trading:bool=True, timezone=None):
         self.ib = ib
         self.live_mode = helpers.set_var_with_constraints(live_mode, constants.CONSTANTS.MODES['live'])
         self.config = trading_config.TradingConfig(live_mode=self.live_mode).set_config(locals())
+        self.seed = seed
+        self.symbols_seed = helpers.get_symbol_seed_list(self.seed)
 
         # self.live_mode = helpers.set_var_with_constraints(self.config.live_mode, constants.CONSTANTS.MODES['live'])
         self.manager = trade_manager.TradeManager(ib, config=self.config)
@@ -61,7 +63,7 @@ class LiveOrchestrator:
             'L2': {'wait_seconds': 5 * 60, 'log_path': os.path.join(date_folder, 'L2_fetcher.log')}, 
             'fetch': {'wait_seconds': 1 * scan_rate_min, 'log_path': os.path.join(date_folder, 'data_fetcher.log')}, 
             'enrich': {'wait_seconds': 1 * scan_rate_min, 'log_path': os.path.join(date_folder, 'data_enricher.log')},
-            'orchestrator': {'wait_seconds': 5 * scan_rate_min}
+            'orchestrator': {'wait_seconds': 20}#5 * scan_rate_min}
         }
     
     def _launch_process(self, target, args=(), new_terminal=True, log_path=None, tail_logs=True):
@@ -89,9 +91,9 @@ class LiveOrchestrator:
             if tail_logs and log_path != os.devnull:
                 process_launcher.tail_log_in_new_terminal(log_path)
 
-    def _organize_tickers_list(self, symbols_scanner):
+    def _organize_tickers_list(self, symbols_scanner:list):
         # Add new tickers
-        for symbol in symbols_scanner:
+        for symbol in self.symbols_seed + symbols_scanner:
             self.tickers_list = self.logger.load_tickers_list(lock=True)
             if symbol not in self.tickers_list:
                 self.tickers_list[symbol] = self.logger.initialize_ticker()
@@ -105,7 +107,7 @@ class LiveOrchestrator:
             self.tickers_list = self.logger.load_tickers_list(lock=True)
             active_symbols = [symbol for symbol in self.tickers_list if self.tickers_list[symbol]['active']]
             for symbol in active_symbols:
-                if symbol not in symbols_scanner:
+                if symbol not in symbols_scanner and symbol not in self.symbols_seed:
                     self.tickers_list = self.logger.update_ticker(symbol, 'active', False, lock=True, log=True)
 
     def run(self):
@@ -273,12 +275,13 @@ if __name__ == "__main__":
     paper_trading = not 'live' in args
     remote_ib = 'remote' in args
     revised = 'revised' in args
+    seed = next((int(arg[5:]) for arg in args if arg.startswith('seed=')), None)
     strategy_name = next((arg[9:] for arg in args if arg.startswith('strategy=')), None)
     mode = next((arg[5:] for arg in args if arg.startswith('mode=')), 'live')
 
     ib, _ = helpers.IBKRConnect_any(IB(), paper=paper_trading, remote=remote_ib)
 
-    orchestrator = LiveOrchestrator(ib, strategy_name=strategy_name, revised=revised,  live_mode=mode, paper_trading=paper_trading, remote_ib=remote_ib)
+    orchestrator = LiveOrchestrator(ib, seed=seed, strategy_name=strategy_name, revised=revised, live_mode=mode, paper_trading=paper_trading, remote_ib=remote_ib)
     orchestrator.run()
 
 

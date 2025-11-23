@@ -12,7 +12,7 @@ class BaseStrategy(abc.ABC):
     Abstract base class for all strategies.
     """
 
-    def __init__(self, name: str, description=None):
+    def __init__(self, name:str, description=None):
         self.name = name
         # self.strategy_subcategories = ["bull", "bear"]
         # self.trigger_columns = [f"{self.name.lower()}_{st_sub}" for st_sub in self.strategy_subcategories]

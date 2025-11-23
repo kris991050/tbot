@@ -206,46 +206,49 @@ class PatternBuilder():
 
     def _add_ranges(self, df):
         tf = self.timeframe
-        if f'bband_h_{tf}' not in df.columns or f'bband_l_{tf}' not in df.columns: print("\nBollinger Bands columns not found.\n")
-        else:
-            df[f'~bband_width_{tf}'] = df[f'bband_h_{tf}'] - df[f'bband_l_{tf}']
-            df[f'bband_width_pct_{tf}'] = df[f'~bband_width_{tf}'].rolling(100).apply(lambda x: (x[-1] - x.min()) / (x.max() - x.min()), raw=True)
-            # df['volume_mean'] = df['volume'].rolling(window=20).mean()
-            df[f'low_volume_{tf}'] = df['volume'] < df['volume'].rolling(window=20).mean()
+        if f'bband_h_{tf}' not in df.columns or f'rsi_{tf}' not in df.columns:
+            indicators_handler = indicators.Indicators(df=df.copy(), ib=self.ib, symbol=self.symbol)
+            if f'bband_h_{tf}' not in df.columns or f'bband_l_{tf}' not in df.columns: indicators_handler.apply_bollinger_bands()#print("\nBollinger Bands columns not found.\n")
+            if f'rsi_{tf}' not in df.columns: df = indicators_handler.apply_rsi()
+        
+        df[f'~bband_width_{tf}'] = df[f'bband_h_{tf}'] - df[f'bband_l_{tf}']
+        df[f'bband_width_pct_{tf}'] = df[f'~bband_width_{tf}'].rolling(100).apply(lambda x: (x[-1] - x.min()) / (x.max() - x.min()), raw=True)
+        # df['volume_mean'] = df['volume'].rolling(window=20).mean()
+        df[f'low_volume_{tf}'] = df['volume'] < df['volume'].rolling(window=20).mean()
 
-            # === atr-Based Range Detection ===
-            df[f'~rolling_high_{tf}'] = df['high'].rolling(window=self.range_window).max()
-            df[f'~rolling_low_{tf}'] = df['low'].rolling(window=self.range_window).min()
-            # df['range_width'] = df['rolling_high'] - df['rolling_low']
-            # df['atr_range'] = 4 * df['atr']
-            # df['atr_in_range'] = df['range_width'] <= df['atr_range']
-            df[f'atr_in_range_{tf}'] = df[f'atr_{tf}'] < df[f'atr_{tf}'].rolling(window=15).mean()
+        # === atr-Based Range Detection ===
+        df[f'~rolling_high_{tf}'] = df['high'].rolling(window=self.range_window).max()
+        df[f'~rolling_low_{tf}'] = df['low'].rolling(window=self.range_window).min()
+        # df['range_width'] = df['rolling_high'] - df['rolling_low']
+        # df['atr_range'] = 4 * df['atr']
+        # df['atr_in_range'] = df['range_width'] <= df['atr_range']
+        df[f'atr_in_range_{tf}'] = df[f'atr_{tf}'] < df[f'atr_{tf}'].rolling(window=15).mean()
 
-            # === Price Action Filter: Inside Bars ===
-            df[f'inside_bar_{tf}'] = (df['high'] <= df['high'].shift(1)) & (df['low'] >= df['low'].shift(1))
+        # === Price Action Filter: Inside Bars ===
+        df[f'inside_bar_{tf}'] = (df['high'] <= df['high'].shift(1)) & (df['low'] >= df['low'].shift(1))
 
-            # === DBSCAN Clustering on Price + Time ===
-            price_time_data = df[['close']].copy()
-            price_time_data['time'] = np.arange(len(df))
-            price_time_data_scaled = (price_time_data - price_time_data.mean()) / price_time_data.std()
+        # === DBSCAN Clustering on Price + Time ===
+        price_time_data = df[['close']].copy()
+        price_time_data['time'] = np.arange(len(df))
+        price_time_data_scaled = (price_time_data - price_time_data.mean()) / price_time_data.std()
 
-            # db = sklearn.cluster.DBSCAN(eps=0.3, min_samples=5)
-            # df['dbscan_cluster'] = db.fit_predict(price_time_data_scaled)
+        # db = sklearn.cluster.DBSCAN(eps=0.3, min_samples=5)
+        # df['dbscan_cluster'] = db.fit_predict(price_time_data_scaled)
 
-            db = hdbscan.HDBSCAN(min_cluster_size=self.min_cluster_size)#, core_dist_n_jobs=-1)
-            df[f'dbscan_cluster_{tf}'] = db.fit_predict(price_time_data_scaled)
+        db = hdbscan.HDBSCAN(min_cluster_size=self.min_cluster_size)#, core_dist_n_jobs=-1)
+        df[f'dbscan_cluster_{tf}'] = db.fit_predict(price_time_data_scaled)
 
-            # === Hybrid Consolidation Flag ===
-            df[f'consolidation_{tf}'] = (
-                (df[f'atr_in_range_{tf}']) &
-                (df[f'bband_width_pct_{tf}'] < 0.2) &
-                df[f'rsi_{tf}'].between(45, 55) &
-                df[f'low_volume_{tf}'] &
-                (df[f'dbscan_cluster_{tf}'] != -1)
-            )
+        # === Hybrid Consolidation Flag ===
+        df[f'consolidation_{tf}'] = (
+            (df[f'atr_in_range_{tf}']) &
+            (df[f'bband_width_pct_{tf}'] < 0.2) &
+            df[f'rsi_{tf}'].between(45, 55) &
+            df[f'low_volume_{tf}'] &
+            (df[f'dbscan_cluster_{tf}'] != -1)
+        )
 
-            # Optional: Add stronger signal when Inside Bar is also present
-            df[f'strong_consolidation_{tf}'] = df[f'consolidation_{tf}'] & df[f'inside_bar_{tf}']
+        # Optional: Add stronger signal when Inside Bar is also present
+        df[f'strong_consolidation_{tf}'] = df[f'consolidation_{tf}'] & df[f'inside_bar_{tf}']
 
         return df
 

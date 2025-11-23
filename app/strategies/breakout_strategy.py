@@ -22,7 +22,8 @@ class BreakoutStrategy(base_strategy.BaseStrategy):
     def __init__(self, direction:str, timeframe:Timeframe, sr_timeframes:list=None, revised:bool=False, 
                  target_factor:float=2, max_time_factor:int=50):
 
-        super().__init__(name=f'breakout_{timeframe}_{direction}', description=f'{direction}ish Breakout signal using S/R levels')
+        self.base_name = 'breakout'
+        super().__init__(name=f'{self.base_name}_{timeframe}_{direction}', description=f'{direction}ish Breakout signal using S/R levels')
         self.direction = helpers.set_var_with_constraints(direction, CONSTANTS.DIRECTIONS)
         self.timeframe = timeframe
         self.sr_timeframes = indicators.IndicatorsUtils.resolve_sr_timeframes(self.timeframe, sr_timeframes)
@@ -103,7 +104,7 @@ def breakout_trigger_bull(row, timeframe, sr_timeframes, revised=False):
     return base_trigger and revised_trigger
 
 def breakout_discard_bull():
-    discard_conditions = False
+    discard_conditions = [False]
     return all(discard_conditions)
 
 def breakout_trigger_bear(row, timeframe, sr_timeframes, revised=False):
@@ -121,7 +122,7 @@ def breakout_trigger_bear(row, timeframe, sr_timeframes, revised=False):
 
 
 def breakout_discard_bear():
-    discard_conditions = False
+    discard_conditions = [False]
     return all(discard_conditions)
 
 

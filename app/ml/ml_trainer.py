@@ -516,6 +516,7 @@ class ModelTrainer:
             self._create_explainer()
             print(f"📦 Model loaded from: {self.paths[save_models_name]}")
         else:
+            # raise ValueError(f"❌ No model found at {self.paths[save_models_name]}. No model loaded.")
             print(f"⚠️ No model found at {self.paths[save_models_name]}. No model loaded.")
 
 

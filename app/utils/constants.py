@@ -83,75 +83,25 @@ class CONSTANTS():
                 {'category': 'price', 'names': ['gap', 'change']}, 
                 {'category': 'vpa', 'names': ['vpa']}
                 ]
-        # INDICATOR_TYPES = [
-        #         {'name': 'ema', 'category': 'trend'}, 
-        #         {'name': 'sma', 'category': 'trend'}, 
-        #         {'name': 'adx', 'category': 'trend'}, 
-        #         {'name': 'macd', 'category': 'trend'}, 
-        #         {'name': 'vwap', 'category': 'volume'}, 
-        #         {'name': 'r_vol', 'category': 'volume'}, 
-        #         {'name': 'avg_vol', 'category': 'volume'}, 
-        #         {'name': 'pm_vol', 'category': 'volume'}, 
-        #         {'name': 'bband', 'category': 'volatility'}, 
-        #         {'name': 'atr', 'category': 'volatility'}, 
-        #         {'name': 'day_range', 'category': 'volatility'}, 
-        #         {'name': 'volatility_ratio', 'category': 'volatility'}, 
-        #         {'name': 'volatility_change', 'category': 'volatility'}, 
-        #         {'name': 'rsi', 'category': 'momentum'}, 
-        #         {'name': 'awesome', 'category': 'momentum'}, 
-        #         {'name': 'gap', 'category': 'price'}, 
-        #         {'name': 'change', 'category': 'price'}
-        #         ]
 
         # Define mappings for candle patterns
         PATTERN_TYPES = [
                 {'category': 'candle', 'names': ['hammer', 'engulfing', 'marubozu', 'doji', 'volume_spike', 'bullish_score', 'bearish_score', 
                                                  'score_bias', 'return', 'directional_bias', 'bias_trend', 'hybrid_bias', 'hybrid_direction']},
                 {'category': 'divergence', 'names': ['divergence']},
-                {'category': 'range', 'names': ['low_volume', 'bband_width_pct', 'atr_in_range', 'inside_bar', 'dbscan_cluster', 'consolidation']},
+                {'category': 'range', 'names': ['low_volume', 'bband_width_pct', 'atr_in_range', 'inside_bar', 'dbscan_cluster', 'consolidation', 'breakout']},
                 {'category': 'breakout', 'names': ['breakout', 'price_buffer_pct']},
                 {'category': 'trend', 'names': ['trend']},
                 {'category': 'index_trend', 'names': ['index_trend']}
                 ]
-        # PATTERN_TYPES = [
-        #         {'name': 'hammer', 'category': 'candle'}, 
-        #         {'name': 'engulfing', 'category': 'candle'}, 
-        #         {'name': 'marubozu', 'category': 'candle'}, 
-        #         {'name': 'doji', 'category': 'candle'}, 
-        #         {'name': 'volume_spike', 'category': 'candle'}, 
-        #         {'name': 'bullish_score', 'category': 'candle'}, 
-        #         {'name': 'bearish_score', 'category': 'candle'}, 
-        #         {'name': 'score_bias', 'category': 'candle'}, 
-        #         {'name': 'return', 'category': 'candle'}, 
-        #         {'name': 'directional_bias', 'category': 'candle'}, 
-        #         {'name': 'bias_trend', 'category': 'candle'}, 
-        #         {'name': 'hybrid_bias', 'category': 'candle'}, 
-        #         {'name': 'hybrid_direction', 'category': 'candle'}, 
-        #         {'name': 'divergence', 'category': 'divergence'}, 
-        #         {'name': 'low_volume', 'category': 'range'}, 
-        #         {'name': 'bband_width_pct', 'category': 'range'}, 
-        #         {'name': 'atr_in_range', 'category': 'range'}, 
-        #         {'name': 'inside_bar', 'category': 'range'}, 
-        #         {'name': 'dbscan_cluster', 'category': 'range'}, 
-        #         {'name': 'consolidation', 'category': 'range'}, 
-        #         {'name': 'breakout', 'category': 'breakout'}, 
-        #         {'name': 'price_buffer_pct', 'category': 'breakout'}, 
-        #         {'name': 'trend', 'category': 'trend'}, 
-        #         {'name': 'index_trend', 'category': 'index_trend'}
-        #         ]
-
+        
         # Define mappings for levels
         LEVEL_TYPES = [
                 {'category': 'daily', 'names': ['levels', 'cam_position', 'cam_D_position']},
                 {'category': 'monthly', 'names': ['levels_M', 'cam_M_position']},
                 {'category': 'camarilla', 'names': ['pivots', 'cam_']}
                 ]
-        # LEVEL_TYPES = [
-        #         {'name': 'levels', 'category': 'daily'}, 
-        #         {'name': 'levels_M', 'category': 'monthly'}, 
-        #         {'name': 'pivots', 'category': 'camarilla'}
-        #         ]
-
+        
         # Define support/resistance (SR) settings
         SR_SETTINGS = [{'timeframe': '1W', 'lookback': '5Y', 'refresh_rate': '1M', 'granularity': 1, 'count_threshold': 2, 'proximity_threshold': 0.5},
                       {'timeframe': '1D', 'lookback': '2Y', 'refresh_rate': '1W', 'granularity': 1, 'count_threshold': 2, 'proximity_threshold': 0.5},

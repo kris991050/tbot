@@ -177,6 +177,12 @@ class TradeManager:
 
         return active_stop_price
 
+    def set_target_for_entry(self, row:pd.Series, stop_price:float, symbol:str):
+        if hasattr(self.strategy_instance.target_handler, 'set_entry_time'):
+            self.strategy_instance.target_handler.set_entry_time(row['date'])
+        if hasattr(self.strategy_instance.target_handler, 'set_target_price'):
+            self.strategy_instance.target_handler.set_target_price(row=row, stop_price=stop_price, symbol=symbol)
+
     def assess_reason2close(self, curr_row:pd.Series, prev_row:pd.Series, active_stop_price:float):
         """
         Determines if the current trade should be closed due to:
@@ -250,7 +256,8 @@ class TradeManager:
         return df
 
     def evaluate_entry_conditions(self, row, stop_price, expand=False, display_triggers=False):
-        stop_price = self.resolve_stop_price(row) if not stop_price else None
+        # stop_price = self.resolve_stop_price(row) if not stop_price else None
+        stop_price = self.resolve_stop_price(row) if not stop_price else stop_price
 
         is_triggered = self.strategy_instance.evaluate_trigger(row)
         is_predicted = self._evaluate_prediction(row.get('model_prediction'), self.config.pred_th)
@@ -274,12 +281,12 @@ class TradeManager:
     
     def get_symbols_from_daily_data_folder(self, date=datetime.now()):
         daily_data_folder = helpers.get_path_daily_data_folder(date, create_if_none=False)
-        if 'bb_rsi_reversal' in self.strategy_instance.name:
-            file_path = os.path.join(daily_data_folder, PATHS.daily_csv_files['bb_rsi_reversal'])
+        if hasattr(self.strategy_instance, 'scanner_data_file_name'):
+            file_path = os.path.join(daily_data_folder, self.strategy_instance.scanner_data_file_name)
         else:
             file_path = None
-        if not os.path.exists(file_path):
-            print(f"❌ Path does not exist: {file_path}")
+        if not file_path or not os.path.exists(file_path):
+            print(f"❌ Path to scanner file does not exist: {file_path}")
             return pd.DataFrame()
         
         df_csv_file = helpers.load_df_from_file(file_path)
@@ -287,20 +294,21 @@ class TradeManager:
         return df_csv_file
         # return [symbol for symbol in df_csv_file['Symbol']]
     
-    def scan_bb_rsi_reversal(self):
-        now = helpers.calculate_now(sim_offset=self.config.sim_offset, tz=self.config.timezone)
-        if not helpers.is_between_market_times('pre-market', 'end_of_tday', now=now, timezone=self.config.timezone):
-            return []
-        print('\n======== FETCHING RSI REVERSALS ========\n')
-        symbols, _ = scanner.scannerTradingView("RSI-Reversal")#scanner.scannerFinviz("RE")
-        return symbols
+    # def scan_bb_rsi_reversal(self):
+    #     now = helpers.calculate_now(sim_offset=self.config.sim_offset, tz=self.config.timezone)
+    #     if not helpers.is_between_market_times('pre-market', 'end_of_tday', now=now, timezone=self.config.timezone):
+    #         return []
+    #     print('\n======== FETCHING RSI REVERSALS ========\n')
+    #     symbols, _ = scanner.scannerTradingView("RSI-Reversal")#scanner.scannerFinviz("RE")
+    #     return symbols
 
     def get_scanner_data(self, now:datetime, use_daily_data:bool=False, last_scanner_check:pd.Timestamp=None):
 
         symbols_scanner = []        
         if not use_daily_data:
-            if 'bb_rsi_reversal' in self.strategy_instance.name:
-                symbols_scanner = self.scan_bb_rsi_reversal()
+            if hasattr(self.strategy_instance, 'scanner_func'):
+                now = helpers.calculate_now(sim_offset=self.config.sim_offset, tz=self.config.timezone)
+                symbols_scanner = self.strategy_instance.scanner_func(now=now, timezone=self.config.timezone)
         else:
             df_csv_file = self.get_symbols_from_daily_data_folder(date=now)
 
@@ -312,7 +320,7 @@ class TradeManager:
                     symbols_scanner = df_csv_file.loc[df_csv_file['Time'] <= now,'Symbol'].tolist()
 
         return symbols_scanner
-
+    
     def fetch_df(self, symbol, from_time, to_time, file_format=FORMATS.DEFAULT_FILE_FORMAT):
         fetcher = hist_market_data_handler.HistMarketDataFetcher(ib=self.ib, ftype='auto', timeframe=self.strategy_instance.timeframe, file_format=file_format, 
                                                                  delete_existing=True, base_folder=self.base_folder, timezone=self.tz)

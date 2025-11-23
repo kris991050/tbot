@@ -43,32 +43,32 @@ def build_symbols_list(trainer):
         return sorted(df['symbol'].unique())#.tolist()
 
 
-def load_test_data(ib, symbol, trainer, data_path, file_format='parquet'):
+# def load_test_data(ib, symbol, trainer, data_path, file_format='parquet'):
 
-    if os.path.exists(data_path):
-        df_test = helpers.load_df_from_file(data_path)
-    else:
-        # df_test = load_test_data_with_predictions(ib, symbol, trainer, file_format='parquet', return_proba=True, shift_features=False)
-        test_to_time = pd.to_datetime(trainer.data_ranges['test'][1], utc=True).tz_convert(constants.CONSTANTS.TZ_WORK)
-        test_from_time = pd.to_datetime(trainer.data_ranges['test'][0], utc=True).tz_convert(constants.CONSTANTS.TZ_WORK)
+#     if os.path.exists(data_path):
+#         df_test = helpers.load_df_from_file(data_path)
+#     else:
+#         # df_test = load_test_data_with_predictions(ib, symbol, trainer, file_format='parquet', return_proba=True, shift_features=False)
+#         test_to_time = pd.to_datetime(trainer.data_ranges['test'][1], utc=True).tz_convert(constants.CONSTANTS.TZ_WORK)
+#         test_from_time = pd.to_datetime(trainer.data_ranges['test'][0], utc=True).tz_convert(constants.CONSTANTS.TZ_WORK)
 
-        if 'bb_rsi_reversal' in strategy:
-            bb_rsi_tf_list = ['5min', '15min', '60min', '1D']
-            enricher = hist_market_data_handler.HistMarketDataEnricher(ib, timeframe=trainer.timeframe, file_format='parquet',
-                                                                    bb_rsi_tf_list=bb_rsi_tf_list, save_to_file=False)
-            results = enricher.run(symbol=symbol)
-            valid_result = enricher.get_valid_result(results)
-            df = valid_result['df'] if valid_result else pd.DataFrame()
-            df_to_time = pd.to_datetime(df['date'].iloc[-1]) if not df.empty else None
-            df_from_time = pd.to_datetime(df['date'].iloc[0]) if not df.empty else None
-            df_test = df[pd.to_datetime(df["date"]).between(max(test_from_time, df_from_time), min(test_to_time, df_to_time))]
-        else:
-            df_test, _ = hist_market_data_handler.HistMarketDataLoader(ib, symbol, trainer.timeframe, file_format=file_format,
-                                                                    data_type='enriched').load_and_trim(test_from_time, test_to_time)
+#         if 'bb_rsi_reversal' in strategy:
+#             bb_rsi_tf_list = ['5min', '15min', '60min', '1D']
+#             enricher = hist_market_data_handler.HistMarketDataEnricher(ib, timeframe=trainer.timeframe, file_format='parquet',
+#                                                                     bb_rsi_tf_list=bb_rsi_tf_list, save_to_file=False)
+#             results = enricher.run(symbol=symbol)
+#             valid_result = enricher.get_valid_result(results)
+#             df = valid_result['df'] if valid_result else pd.DataFrame()
+#             df_to_time = pd.to_datetime(df['date'].iloc[-1]) if not df.empty else None
+#             df_from_time = pd.to_datetime(df['date'].iloc[0]) if not df.empty else None
+#             df_test = df[pd.to_datetime(df["date"]).between(max(test_from_time, df_from_time), min(test_to_time, df_to_time))]
+#         else:
+#             df_test, _ = hist_market_data_handler.HistMarketDataLoader(ib, symbol, trainer.timeframe, file_format=file_format,
+#                                                                     data_type='enriched').load_and_trim(test_from_time, test_to_time)
 
-        helpers.save_df_to_file(df_test, data_path, file_format='parquet')
+#         helpers.save_df_to_file(df_test, data_path, file_format='parquet')
 
-    return df_test
+#     return df_test
 
 
 class CustomBacktestEngine:
@@ -128,10 +128,11 @@ class CustomBacktestEngine:
                     self.active_stop_price = self.manager.resolve_stop_price(curr_row, self.active_stop_price)
 
                     # Set target entry time and price
-                    if hasattr(self.manager.strategy_instance.target_handler, 'set_entry_time'):
-                        self.manager.strategy_instance.target_handler.set_entry_time(curr_row['date'])
-                    if hasattr(self.manager.strategy_instance.target_handler, 'set_target_price'):
-                        self.manager.strategy_instance.target_handler.set_target_price(row=decision_row, stop_price=self.active_stop_price, symbol=self.symbol)
+                    # if hasattr(self.manager.strategy_instance.target_handler, 'set_entry_time'):
+                    #     self.manager.strategy_instance.target_handler.set_entry_time(curr_row['date'])
+                    # if hasattr(self.manager.strategy_instance.target_handler, 'set_target_price'):
+                    #     self.manager.strategy_instance.target_handler.set_target_price(row=decision_row, stop_price=self.active_stop_price, symbol=self.symbol)
+                    self.manager.set_target_for_entry(row=decision_row, stop_price=self.active_stop_price, symbol=symbol)
 
                     reason2close = self.manager.assess_reason2close(decision_row, prev_decision_row, self.active_stop_price)
                     if not reason2close:

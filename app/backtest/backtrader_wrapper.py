@@ -206,10 +206,11 @@ class BacktraderStrategyWrapper(bt.Strategy):
                 self.active_stop_price = self.manager.resolve_stop_price(decision_row, self.active_stop_price)
 
                 # Set target entry time and price
-                if hasattr(self.manager.strategy_instance.target_handler, 'set_entry_time'):
-                    self.manager.strategy_instance.target_handler.set_entry_time(curr_row['date'])
-                if hasattr(self.manager.strategy_instance.target_handler, 'set_target_price'):
-                    self.manager.strategy_instance.target_handler.set_target_price(row=decision_row, stop_price=self.active_stop_price)
+                # if hasattr(self.manager.strategy_instance.target_handler, 'set_entry_time'):
+                #     self.manager.strategy_instance.target_handler.set_entry_time(curr_row['date'])
+                # if hasattr(self.manager.strategy_instance.target_handler, 'set_target_price'):
+                #     self.manager.strategy_instance.target_handler.set_target_price(row=decision_row, stop_price=self.active_stop_price)
+                self.manager.set_target_for_entry(row=decision_row, stop_price=self.active_stop_price, symbol=self.symbol)
 
                 reason2close = self.manager.assess_reason2close(decision_row, prev_decision_row, self.active_stop_price)
                 if reason2close:
