@@ -1,4 +1,4 @@
-import sys, os, pandas as pd, backtrader as bt, pytz, re
+import sys, os, pandas as pd, backtrader as bt, pytz, re, numpy as np
 from datetime import datetime
 
 parent_folder = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -13,6 +13,7 @@ from strategies import bb_rsi_reversal_strategy, sr_bounce_strategy, breakout_st
 from live import trading_config
 from ml import ml_trainer
 from miscellaneous import scanner
+from features import indicators
 
 
 def get_strategy_instance(strategy_name:str, config:trading_config.TradingConfig=None):
@@ -26,12 +27,12 @@ def get_strategy_instance(strategy_name:str, config:trading_config.TradingConfig
         for tf in ['15min', '1h', '4h', '1D']:
             if f'sr_bounce_{tf}_{direction}' in strategy_name:
                 return sr_bounce_strategy.SRBounceStrategy(direction=direction, timeframe=Timeframe(tf), cam_M_threshold=config.cam_M_threshold, 
-                                                           revised=config.revised, target_factor=config.perc_gain, 
+                                                           revised=config.revised, target_factor=config.volatility_factor*config.profit_ratio, #target_factor=config.perc_gain, 
                                                            max_time_factor=config.max_time_factor)
         for tf in ['5min', '15min']:
             if f'breakout_{tf}_{direction}' in strategy_name:
                 return breakout_strategy.BreakoutStrategy(direction=direction, timeframe=Timeframe(tf), 
-                                                           revised=config.revised, target_factor=config.perc_gain, 
+                                                           revised=config.revised, target_factor=config.volatility_factor*config.profit_ratio, #target_factor=config.perc_gain, 
                                                            max_time_factor=config.max_time_factor)
             
     raise ValueError(f"Strategy '{strategy_name}' not recognized")
@@ -77,6 +78,8 @@ class TradeManager:
             stop_hdlr = target_handler.PredictedDrawdownStopLossHandler(dd_col='predicted_drawdown')
         elif self.config.stop == 'hod':
             stop_hdlr = target_handler.HighOfDayStopLossHandler(direction=self.strategy_instance.direction)
+        elif self.config.stop == 'pred_vlty':
+            stop_hdlr = target_handler.PredictedVolatilityStopLossHandler(volatility_factor=self.config.volatility_factor, timeframe=self.strategy_instance.timeframe)
         else:
             stop_hdlr = None # Optional fallback
 
@@ -115,7 +118,10 @@ class TradeManager:
             required_columns.remove('market_cap_cat')
         return required_columns
 
-    def _resolve_features(self):
+    def _resolve_features(self, select_features:bool=True):
+        if not select_features:
+            return ['all'], None
+        
         required_columns = self.get_required_columns()
         feature_types = {'indicator_types': [], 'pattern_types': [], 'candle_pattern_list': ['all'], 'level_types': [], 'sr_types': []}
         mtf = []
@@ -315,7 +321,7 @@ class TradeManager:
         
         return df
 
-    def complete_df(self, symbol, file_format='parquet'):
+    def complete_df(self, symbol, file_format=FORMATS.DEFAULT_FILE_FORMAT):
         completer = hist_market_data_handler.HistMarketDataCompleter(self.ib, self.strategy_instance.timeframe, file_format, [symbol], 
                                                                      self.config.step_duration, base_folder=self.base_folder, timezone=self.tz)
         results = completer.run()
@@ -323,16 +329,57 @@ class TradeManager:
         
         return df
 
-    def enrich_df(self, symbol, file_format:str='parquet', block_add_sr:bool=False, base_timeframe:Timeframe=None, from_time:datetime=None, 
+    # @staticmethod
+    # def calculate_garch_volatility_recursive(self, close_series:pd.Series, window:int=250, p:int=1, q:int=1):
+    #     """
+    #     Calculate GARCH volatility recursively for each row. Using rolling window to limit computational cost.
+    #     """
+    #     print(f"🎢 Calculating GARCH volatility recursively...")
+    #     vol_list = [np.nan] * len(close_series)
+
+    #     for i in range(window, len(close_series)):
+    #         window_prices = close_series.iloc[i-window:i]
+    #         vol_list[i] = helpers.calculate_garch_volatility(window_prices, p=p, q=q)
+
+    #     return pd.Series(vol_list, index=close_series.index)
+    
+    def add_pred_vlty(self, row:pd.Series, symbol:str):
+        if not isinstance(self.strategy_instance.target_handler, target_handler.PredictedVolatilityTargetHandler) and \
+            not isinstance(self.stop_handler, target_handler.PredictedVolatilityStopLossHandler):
+            return row
+
+        # Add predicted volatility
+        wto_time = row['date']
+        window_tf = Timeframe(CONSTANTS.WARMUP_MAP[self.strategy_instance.timeframe.pandas])
+        wfrom_time = window_tf.subtract_from_date(wto_time)
+        df_warmup = self.fetch_df(symbol=symbol, from_time=wfrom_time, to_time=wto_time, file_format=self.config.file_format)
+        close_series = df_warmup[['date', 'close']].set_index('date', inplace=False)
+        
+        # combined = pd.concat([df_warmup[['date', 'close']], df[['date', 'close']]], ignore_index=True)
+        # combined = combined.drop_duplicates(subset=['date']).sort_values('date')
+        # combined.index = combined['date']  # use date as index
+
+        if self.config.pred_vlty_type == 'garch':
+            row['pred_vlty'] = helpers.calculate_garch_volatility(close_series)
+        if self.config.pred_vlty_type == 'ewma':
+            row['pred_vlty'] = indicators.IndicatorsUtils.calculate_pred_vlty_recursive(close_series, window=window_tf.to_timedelta, type='ewma')
+
+        # # Merge only needed volatility column back into df
+        # df = df.merge(combined[['date', 'garch_volatility']], on='date', how='left')
+
+        return row
+
+    def enrich_df(self, symbol, file_format:str=FORMATS.DEFAULT_FILE_FORMAT, block_add_sr:bool=False, base_timeframe:Timeframe=None, from_time:datetime=None, 
                   to_time:datetime=None, select_features:bool=True):
-        feature_types, mtf = self._resolve_features() if select_features else ['all'], None
+        feature_types, mtf = self._resolve_features(select_features)
         enricher = hist_market_data_handler.HistMarketDataEnricher(self.ib, timeframe=self.strategy_instance.timeframe, base_timeframe=base_timeframe, 
                                                                    feature_types=feature_types, mtf=mtf, file_format=file_format, base_folder=self.base_folder, 
                                                                    validate=False, block_add_sr=block_add_sr, timezone=self.tz)
         results = enricher.run(symbol=symbol, from_time=from_time, to_time=to_time)
         valid_results = enricher.get_valid_result(results)
+        df = valid_results['df'] if valid_results else pd.DataFrame()
 
-        return valid_results['df'] if valid_results else pd.DataFrame()
+        return df 
     
     def load_data_live(self, symbol, trig_time, to_time=None, file_format='parquet', block_add_sr=False):
 

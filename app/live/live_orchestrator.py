@@ -271,14 +271,14 @@ if __name__ == "__main__":
     pd.options.mode.chained_assignment = None # Disable Pandas warnings
 
     paper_trading = not 'live' in args
-    local_ib = 'local' in args
+    remote_ib = 'remote' in args
     revised = 'revised' in args
     strategy_name = next((arg[9:] for arg in args if arg.startswith('strategy=')), None)
     mode = next((arg[5:] for arg in args if arg.startswith('mode=')), 'live')
 
-    ib, _ = helpers.IBKRConnect_any(IB(), paper=paper_trading, remote=not local_ib)
+    ib, _ = helpers.IBKRConnect_any(IB(), paper=paper_trading, remote=remote_ib)
 
-    orchestrator = LiveOrchestrator(ib, strategy_name=strategy_name, revised=revised,  live_mode=mode, paper_trading=paper_trading, remote_ib=not local_ib)
+    orchestrator = LiveOrchestrator(ib, strategy_name=strategy_name, revised=revised,  live_mode=mode, paper_trading=paper_trading, remote_ib=remote_ib)
     orchestrator.run()
 
 

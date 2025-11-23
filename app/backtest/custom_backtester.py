@@ -122,6 +122,7 @@ class CustomBacktestEngine:
                     decision_prediction = decision_row['model_prediction']
                     entry_prediction = curr_row['model_prediction']
                     quantity = self.manager.evaluate_quantity(entry_prediction)
+                    curr_row = self.manager.add_pred_vlty(curr_row, self.symbol)
 
                     # Resolve stop once here
                     self.active_stop_price = self.manager.resolve_stop_price(curr_row, self.active_stop_price)
@@ -130,7 +131,7 @@ class CustomBacktestEngine:
                     if hasattr(self.manager.strategy_instance.target_handler, 'set_entry_time'):
                         self.manager.strategy_instance.target_handler.set_entry_time(curr_row['date'])
                     if hasattr(self.manager.strategy_instance.target_handler, 'set_target_price'):
-                        self.manager.strategy_instance.target_handler.set_target_price(row=decision_row, stop_price=self.active_stop_price)
+                        self.manager.strategy_instance.target_handler.set_target_price(row=decision_row, stop_price=self.active_stop_price, symbol=self.symbol)
 
                     reason2close = self.manager.assess_reason2close(decision_row, prev_decision_row, self.active_stop_price)
                     if not reason2close:

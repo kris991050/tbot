@@ -30,6 +30,8 @@ class TradingConfig:
         self.max_loss_perc: int = 1
         self.partial_perc: int = 10
         self.default_currency: str = 'USD'
+        self.pred_vlty_type: str = 'garch' # 'ewma'
+        self.volatility_factor: int = 2
 
         # ML model config
         self.model_type: str = 'xgboost'
@@ -39,7 +41,7 @@ class TradingConfig:
         # Strategy config
         self.strategy_name = 'bb_rsi_reversal_1min_bear'
         self.revised = False
-        self.stop = 'hod'
+        self.stop = 'pred_vlty'
         self.paper_trading = True
         self.remote_ib = True
 

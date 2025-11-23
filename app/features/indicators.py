@@ -1,4 +1,4 @@
-import os, sys, pandas as pd, ta, numpy as np, traceback
+import os, sys, pandas as pd, ta, numpy as np, traceback, tqdm
 from datetime import timedelta
 from ib_insync import *
 
@@ -22,8 +22,8 @@ from features import levels_pivots
 # ======================
 
 class Indicators:
-    def __init__(self, df, ib, symbol, types:list=['all'], rsi_window:int=14, adx_window:int=14,
-                 atr_window:int=14, vol_window:int=20, vpa_window:int=20, bb_window:int=20, bb_dev:int=2,
+    def __init__(self, df, ib, symbol, types:list=['all'], rsi_window:int=14, adx_window:int=14, atr_window:int=14, vol_window:int=20, 
+                 vpa_window:int=20, bb_window:int=20, bb_dev:int=2, pred_vlty_type:str='ewma', 
                  macd_windows:dict={'slow':26, 'fast':12, 'sign':9, 'roll':20}, awesome_windows:dict={'slow':34, 'fast':5}):
         self.df = df
         self.ib = ib
@@ -39,6 +39,7 @@ class Indicators:
         self.bb_dev = bb_dev
         self.macd_windows = macd_windows
         self.awesome_windows = awesome_windows
+        self.pred_vlty_type = pred_vlty_type
 
         # Store original attributes to preserve them in final df
         self.attrs = df.attrs
@@ -104,6 +105,7 @@ class Indicators:
         self.apply_bollinger_bands()
         self.apply_atr()
         self.apply_volatility_ratio()
+        # self.apply_pred_vlty()
 
     def _apply_momentum_indicators(self):
         print(f"Applying momentum indicators for {self.tf}...")
@@ -234,6 +236,14 @@ class Indicators:
         if self.df.empty: return self.df
         self.df[f'volatility_ratio_{self.tf}'] = self.df.volume / (self.df.volume - self.df.volume.diff())
         self.df[f'volatility_change_{self.tf}'] = self.df['volume'].pct_change()
+        return self.df
+    
+    def apply_pred_vlty(self):
+        if self.df.empty: return self.df
+        lookback_period = Timeframe(CONSTANTS.WARMUP_MAP.get(self.tf.pandas, None)).to_timedelta
+        close_series = self.df[['date', 'close']].set_index('date', inplace=False)
+        self.df[f'pred_vlty_{self.tf}'] = IndicatorsUtils.calculate_pred_vlty_recursive(close_series=close_series, window=lookback_period, 
+                                                                                                              type=self.pred_vlty_type)
         return self.df
 
     def apply_vpa(self):
@@ -690,6 +700,43 @@ class IndicatorsUtils:
                 continue
         sr_tfs = [tf for tf in sr_tfs.copy() if tf not in tf_to_remove]
         return sr_tfs
+    
+    @staticmethod
+    def calculate_pred_vlty_recursive(close_series:pd.Series, window:timedelta, p:int=1, q:int=1, lambda_:float=0.94, type:str='ewma'):
+        """
+        Calculate prediucted volatility recursively for each row using a rolling window defined by timedelta.
+        
+        :param close_series: The pandas Series of historical close prices with a datetime index.
+        :param window: A timedelta object representing the rolling window size.
+        :param p: The order of the GARCH model (GARCH(p, q)).
+        :param q: The order of the GARCH model (GARCH(p, q)).
+        :param lambda_: Decay factor for the EWMA model.
+        :return: A pandas Series with the GARCH volatility for each row.
+        """
+        print(f"🎢 Calculating predicted volatility recursively using {type.upper()} method with a time window of {window}...")
+        
+        # List to store the volatilities for each row
+        vol_list = [np.nan] * len(close_series)
+        prev_volatility = 0.0 # For calculation with EWMA method
+
+        # Iterate through each row, starting from the point where the window is fully populated
+        # for i in range(len(close_series)):
+        for i in tqdm.tqdm(range(len(close_series)), desc="Calculating Predicted Volatility", ncols=100, ascii=True):
+            window_start_time = close_series.index[i] - window
+
+            # Select data in the window: filter out rows where timestamp is older than window_start_time
+            window_prices = close_series[close_series.index >= window_start_time].iloc[:i+1]
+            
+            # If there is enough data in the window to fit the GARCH model, calculate volatility
+            if len(window_prices) > 1:  # Ensure there's more than 1 data point to calculate returns
+                if type == 'garch':
+                    prev_volatility = helpers.calculate_garch_volatility(window_prices, p=p, q=q)
+                elif type == 'ewma':
+                    prev_volatility = helpers.calculate_ewma_volatility(window_prices, lambda_=lambda_, prev_volatility=prev_volatility)
+                vol_list[i] = prev_volatility
+        
+        # Return the volatility as a pandas Series
+        return pd.Series(vol_list)#, index=close_series.index)
 
 
 if __name__ == "__main__":

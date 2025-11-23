@@ -114,16 +114,7 @@ class TimeDeltaTargetHandler(TargetHandler):
         if curr_row['date'] >= end_time:
             return 'timedelta_exit'
         return None
-
-
-# class EODTargetHandler(TargetHandler):
-#     def __init__(self, rth_only: bool = False, timezone=CONSTANTS.TZ_WORK):
-#         self.end_time = CONSTANTS.TH_TIMES['post-market'] if rth_only else CONSTANTS.TH_TIMES['end_of_day']
-#         self.timezone = timezone
-
-#     def get_target_time(self, df:pd.DataFrame, trigger_time: pd.Timestamp) -> pd.Timestamp:
-#         date = trigger_time.date()
-#         return pd.Timestamp.combine(date, self.end_time).tz_localize(self.timezone)
+    
 
 class EODTargetHandler(TargetHandler):
     def __init__(self, rth_only:bool=False, timezone=CONSTANTS.TZ_WORK):
@@ -154,7 +145,7 @@ class FixedTargetHandler(TargetHandler):
         self.target_price = None
         self.target_str = 'fixed'
     
-    def set_target_price(self, row:pd.Series, stop_price:float=None):
+    def set_target_price(self, row:pd.Series, stop_price:float=None, symbol:str=None):
         self.target_price = row['close'] # Placeholder for now
     
     def get_target_time(self,  df:pd.DataFrame, trigger_time:pd.Timestamp) -> pd.Timestamp:
@@ -214,7 +205,7 @@ class PercGainTargetHandler(FixedTargetHandler):
         self.target_price = None
         self.target_str = f'perc_gain_{perc_gain}%'
 
-    def set_target_price(self, row:pd.Series, stop_price:float=None):
+    def set_target_price(self, row:pd.Series, stop_price:float=None, symbol:str=None):
         self.target_price = row['close'] * (1 + self.dir_int * (self.perc_gain / 100))
 
 
@@ -225,7 +216,7 @@ class ProfitRatioTargetHandler(FixedTargetHandler):
         self.target_price = None
         self.target_str = f'profit_ratio_{self.profit_ratio}'
 
-    def set_target_price(self, row:pd.Series, stop_price:float=None):
+    def set_target_price(self, row:pd.Series, stop_price:float=None, symbol:str=None):
         stop_price = stop_price or row['close']
         self.target_price = row['close'] * self.dir_int * self.profit_ratio * abs(row['close'] - stop_price)
 
@@ -263,7 +254,7 @@ class NextLevelTargetHandler(FixedTargetHandler):
             psychological_level = (current_price // increment) * increment
         return psychological_level
 
-    def set_target_price(self, row:pd.Series, stop_price:float=None):
+    def set_target_price(self, row:pd.Series, stop_price:float=None, symbol:str=None):
         dist_next_levels = [{'value': row[f"{level}_dist_to_next_{self.dir}"], 'level': level} for level in self.level_types]
         dist_next_level = min(dist_next_levels, key=lambda x: x['value'])
 
@@ -273,60 +264,28 @@ class NextLevelTargetHandler(FixedTargetHandler):
         else:
             self.target_price = row['close'] + self.dir_int * dist_next_level['value']
             self.next_level = dist_next_level['level']
-    
-    # def get_target_time(self, df:pd.DataFrame, trigger_time:pd.Timestamp) -> pd.Timestamp:
-    #     # Ensure all required columns are present in the dataframe
-    #     if not set(self.required_columns).issubset(df.columns):
-    #         raise ValueError(f"Required columns {self.required_columns} not found in dataframe")
 
-    #     # Ensure trigger_time exists in the dataframe index
-    #     if trigger_time not in df.index:
-    #         raise ValueError(f"trigger_time {trigger_time} not found in dataframe index")
 
-    #     # Resolve the max target time based on the given max_time and timezone
-    #     max_target_time = resolve_max_time(trigger_time, self.max_time, timezone=self.timezone)
+class PredictedVolatilityTargetHandler(FixedTargetHandler):
+    def __init__(self, volatility_factor:float, direction:str, timeframe:Timeframe, max_time:timedelta=None, timezone=CONSTANTS.TZ_WORK):
+        """
+        Predicted Target Handler, setting the target price based on predicted volatility, using GARCH or EWMA model.
+        :param volatility_factor: Factor to multiply the predicted volatility for the target.
+        """
+        super().__init__(direction=direction, max_time=max_time, timezone=timezone)
+        self.volatility_factor = volatility_factor
+        self.target_str = f'pred_vlty_{self.volatility_factor}'
+        self.timeframe = timeframe
+        self.required_columns = [f'atr_{self.timeframe}']
 
-    #     # Slice the dataframe from the trigger time onward
-    #     post_df = df.loc[trigger_time:]
-    #     if max_target_time:
-    #         post_df = post_df[post_df.index <= max_target_time]
-
-    #     if post_df.empty:
-    #         return trigger_time  # Return trigger_time if no data after it
-
-    #     if not self.target_price:
-    #         self.set_target_price(df.loc[trigger_time])
-
-    #     # trig_close = df.at[trigger_time, 'close']
-    #     # direction = np.sign(trig_close - self.target_price)
-    #     direction = -self.dir_int
+    def set_target_price(self, row:pd.Series, stop_price:float=None, symbol:str=None):
+        pred_vlty = row.get('pred_vlty', None)
+        if pred_vlty is None:
+            # print("≈ No predicted volatility found in current data. Fallback on ATR for rough approximation.")
+            pred_vlty = row[f'atr_{self.timeframe}']
+            # raise ValueError("Predicted volatility must be provided for Predicted Volatility target.")
         
-    #     sign_diff = (post_df['close'] - self.target_price).apply(np.sign).diff()
-    #     cross_rows = post_df[sign_diff == -2 * direction]
-
-    #     if not cross_rows.empty:
-    #         return cross_rows.index[0]
-    #     else:
-    #         return post_df.index[-1]
-        
-    # def get_target_event(self, prev_row:pd.Series, curr_row:pd.Series, entry_time:pd.Timestamp=None) -> Optional[str]:
-    #     entry_time = entry_time or self.entry_time
-    #     if prev_row is None or entry_time is None:
-    #         return None
-
-    #     max_target_time = resolve_max_time(entry_time, self.max_time, timezone=self.timezone)
-
-    #     if not self.target_price:
-    #         self.set_target_price(curr_row)
-        
-    #     prev_diff = prev_row['close'] - self.target_price
-    #     curr_diff = curr_row['close'] - self.target_price
-
-    #     if max_target_time and curr_row['date'] > max_target_time:
-    #         return 'max_time_overshoot'
-    #     if np.sign(prev_diff) != np.sign(curr_diff) and curr_diff * self.dir_int > 0:
-    #         return f'{self.target_str}_cross_exit'
-    #     return None
+        self.target_price = row['close'] + (self.volatility_factor * pred_vlty * self.dir_int)
     
 
 class VWAPCrossTargetHandler(TargetHandler):
@@ -406,21 +365,10 @@ class FixedStopLossHandler(StopLossHandler):
         self.sl_pct = sl_pct
         self.required_columns = []
         self.stop_type = 'fixed'
-
-    # def check_stop_loss(self, curr_row, entry_price, direction) -> Optional[str]:
-    #     stop_loss = self.resolve_stop_price(entry_price, direction)
-    #     if (curr_row['close'] <= stop_loss and direction == 1) or (curr_row['close'] >= stop_loss and direction == -1):
-    #         return f'Fixed stop_loss reached {stop_loss}'
-    #     return None
     
     def resolve_stop_price(self, entry_row:float, direction:int):
         stop_price = entry_row['close'] * (1 - direction * self.sl_pct)
         return stop_price, self.stop_type
-
-    # def check_stop_loss(self, curr_row, stop_price, direction) -> Optional[str]:
-    #     if (curr_row['close'] <= stop_price and direction == 1) or (curr_row['close'] >= stop_price and direction == -1):
-    #         return f'Fixed stop_loss reached at {stop_price}'
-    #     return None
 
 
 class NextLevelStopLossHandler(StopLossHandler):
@@ -495,18 +443,6 @@ class NextLevelStopLossHandler(StopLossHandler):
 
         return None, None
     
-    # def check_stop_loss(self, curr_row, stop_price, direction) -> Optional[str]:
-    #     """
-    #     Compares current price to stop loss threshold.
-    #     :param curr_row: Current candle data
-    #     :param stop_price: Calculated stop level
-    #     :param direction: 1 for long, -1 for short
-    #     """
-    #     close = curr_row['close']
-    #     if (direction == 1 and close <= stop_price) or (direction == -1 and close >= stop_price):
-    #         return f'Level stop_loss reached at {stop_price}'
-    #     return None
-    
 
 class HighOfDayStopLossHandler(StopLossHandler):
     def __init__(self, direction:str='bull', offset:float=0.05):
@@ -518,18 +454,33 @@ class HighOfDayStopLossHandler(StopLossHandler):
     def resolve_stop_price(self, entry_row, direction:int) -> Optional[tuple[float, str]]:
         stop_price = entry_row[self.stop_type] * (1 - direction * self.offset)
         return stop_price, self.stop_type
+
+
+class PredictedVolatilityStopLossHandler(StopLossHandler):
+    def __init__(self, volatility_factor:float, timeframe:Timeframe):
+        """
+        GARCH Stop Loss Handler, setting the stop loss based on predicted volatility.
+        :param volatility_factor: Factor to multiply the predicted volatility for the stop.
+        """
+        self.timeframe = timeframe
+        self.volatility_factor = volatility_factor
+        self.stop_type = 'pred_vlty'
+        self.required_columns = [f'atr_{self.timeframe}']
+
+    def resolve_stop_price(self, entry_row:pd.Series, direction:int) -> Optional[tuple[float, str]]:
+        """
+        Resolves the stop price based on predicted volatility using the GARCH model.
+        """
+        pred_vlty = entry_row.get('pred_vlty', None)
+
+        if pred_vlty is None or np.isnan(pred_vlty):
+            # print("≈ No predicted volatility found in current data. Fallback on ATR for rough approximation.")
+            pred_vlty = entry_row[f'atr_{self.timeframe}']
         
-    # def check_stop_loss(self, curr_row, stop_price, direction) -> Optional[str]:
-    #     """
-    #     Compares current price to stop loss threshold.
-    #     :param curr_row: Current candle data
-    #     :param stop_price: Calculated stop level
-    #     :param direction: 1 for long, -1 for short
-    #     """
-    #     close = curr_row['close']
-    #     if (direction == 1 and close <= stop_price) or (direction == -1 and close >= stop_price):
-    #         return 'stop_loss'
-    #     return None
+        # Calculate the stop price as a multiple of the predicted volatility
+        stop_price = entry_row['close'] - (self.volatility_factor * pred_vlty * direction)
+
+        return stop_price, self.stop_type
 
 
 class PredictedDrawdownStopLossHandler(StopLossHandler):
@@ -552,14 +503,6 @@ class PredictedDrawdownStopLossHandler(StopLossHandler):
         stop_price = entry_price - direction * abs(predicted_dd)
 
         return stop_price, self.stop_type
-
-    # def check_stop_loss(self, curr_row, stop_price, direction) -> Optional[str]:
-    #     """
-    #     Check if the stop-loss level has been hit based on the current bar.
-    #     """
-    #     if (direction == 1 and curr_row['low'] <= stop_price) or (direction == -1 and curr_row['high'] >= stop_price):
-    #         return f"{self.stop_type.capitalize()} stop loss reached at {stop_price:.2f}"
-    #     return None
 
 
 # class NextLevelStopLossHandler(StopLossHandler):

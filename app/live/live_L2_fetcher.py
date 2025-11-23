@@ -66,14 +66,14 @@ if __name__ == "__main__":
 
     args = sys.argv
     paper_trading = not 'live' in args
-    local_ib = 'local' in args
+    remote_ib = 'remote' in args
     continuous = not 'snapshot' in args
     single_symbol = next(([arg[7:]] for arg in args if arg.startswith('symbol=')), None)
     wait_seconds = next((int(float(arg[5:])) for arg in args if arg.startswith('wait=')), 5*60)
     ib_client_id = next((int(arg[7:]) for arg in args if arg.startswith('client=')), 10)
 
     fetcher = LiveL2Fetcher(worker_type='L2_fetcher', wait_seconds=wait_seconds, continuous=continuous, single_symbol=single_symbol, 
-                            ib_disconnect=True, ib_client_id=ib_client_id, paper_trading=paper_trading, remote_ib=not local_ib, no_log=True)
+                            ib_disconnect=True, ib_client_id=ib_client_id, paper_trading=paper_trading, remote_ib=remote_ib, no_log=True)
     fetcher.run()
 
 # def get_symbols(folder=helpers.get_path_daily_data_folder()):

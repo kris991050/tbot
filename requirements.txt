@@ -31,3 +31,4 @@ plotly
 numba
 xgboost
 shap
+arch

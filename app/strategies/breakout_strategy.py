@@ -20,7 +20,7 @@ from features import indicators
 class BreakoutStrategy(base_strategy.BaseStrategy):
 
     def __init__(self, direction:str, timeframe:Timeframe, sr_timeframes:list=None, revised:bool=False, 
-                 target_factor:float=5, max_time_factor:int=50):
+                 target_factor:float=2, max_time_factor:int=50):
 
         super().__init__(name=f'breakout_{timeframe}_{direction}', description=f'{direction}ish Breakout signal using S/R levels')
         self.direction = helpers.set_var_with_constraints(direction, CONSTANTS.DIRECTIONS)
@@ -40,7 +40,9 @@ class BreakoutStrategy(base_strategy.BaseStrategy):
         max_time = max_time_factor * self.timeframe.to_timedelta
         # self.target_handler = target_handler.NextLevelTargetHandler(level_types=level_types, timeframe=self.timeframe, direction=self.direction, 
         #                                                             max_time=max_time)
-        self.target_handler = target_handler.PercGainTargetHandler(perc_gain=target_factor, direction=self.direction, max_time=max_time)
+        # self.target_handler = target_handler.PercGainTargetHandler(perc_gain=target_factor, direction=self.direction, max_time=max_time)
+        self.target_handler = target_handler.PredictedVolatilityTargetHandler(volatility_factor=target_factor, direction=self.direction, timeframe=self.timeframe, 
+                                                                              max_time=max_time)
         self.stop_handler = None
         self.required_columns = self._build_required_columns()
         self.required_features = {'indicators': [], 'levels': [], 'patterns': ['range', 'breakout'], 'sr': self.sr_timeframes}

@@ -34,8 +34,10 @@ class SRBounceStrategy(base_strategy.BaseStrategy):
         max_time = max_time_factor * self.timeframe.to_timedelta
         # self.target_handler = target_handler.NextLevelTargetHandler(level_types=level_types, timeframe=self.timeframe, direction=self.direction, 
         #                                                             max_time=max_time)
-        self.target_handler = target_handler.PercGainTargetHandler(perc_gain=target_factor, direction=self.direction, max_time=max_time)
+        # self.target_handler = target_handler.PercGainTargetHandler(perc_gain=target_factor, direction=self.direction, max_time=max_time)
         # self.target_handler = target_handler.ProfitRatioTargetHandler(profit_ratio=target_factor, direction=self.direction, max_time=max_time)
+        self.target_handler = target_handler.PredictedVolatilityTargetHandler(volatility_factor=target_factor, direction=self.direction, timeframe=self.timeframe, 
+                                                                              max_time=max_time)
         self.stop_handler = None
         self.required_columns = self._build_required_columns()
         self.required_features = {'indicators': [], 'levels': ['monthly'], 'patterns': [], 'sr': self.sr_timeframes}

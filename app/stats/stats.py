@@ -45,7 +45,7 @@ if __name__ == "__main__":
     # Arguments management
     args = sys.argv
     paperTrading = not 'live' in args
-    local_ib = 'local' in args
+    remote_ib = 'remote' in args
     display_res = 'display' in args
     revised = 'revised' in args
     seed = next((int(arg[5:]) for arg in args if arg.startswith('seed=')), None)
@@ -58,7 +58,7 @@ if __name__ == "__main__":
 
 
     # TWS Connection
-    ib, ibConnection = helpers.IBKRConnect_any(IB(), paper=paperTrading, remote=not local_ib)
+    ib, ibConnection = helpers.IBKRConnect_any(IB(), paper=paperTrading, remote=remote_ib)
 
     # ib = IB()
     # contract = Stock(symbol=symbol, exchange='SMART', currency='USD')
@@ -90,10 +90,10 @@ if __name__ == "__main__":
         mtf = None
         strategy_func_list = []
         target_list = []
-        for ttf in [1.5, 2, 5]:
+        for ttf in [1, 2, 3]:
             config = trading_config.TradingConfig()
             config.strategy_name = strategy
-            config.perc_gain = ttf
+            config.volatility_factor = ttf
             strategy_func = trade_manager.get_strategy_instance(strategy_name=strategy, config=config)
             # strategy_func = trade_manager.get_strategy_instance(strategy_name=strategy, revised=revised, cam_M_threshold=3, max_time_factor=ttf)
             strategy_func_list.append(strategy_func)

@@ -68,6 +68,7 @@ class CONSTANTS():
         MODES = {'live': ['live', 'sim'], 'backtest': ['backtest', 'forward']}
         LIVE_ACTIONS = ['fetch', 'enrich', 'execut']
         FETCHER_TYPES = ['ibkr', 'polygon']
+        pred_vlty_TYPES = ['garch', 'ewma']
         DEFAULT_TIMEFRAME = {'multiplier': 1, 'unit': 'minute'}
         DIRECTIONS = ['bull', 'bear']
 

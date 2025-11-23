@@ -1,4 +1,4 @@
-import os, sys, time, requests, csv, re, prettytable, numpy as np, json, speedtest, pandas_market_calendars
+import os, sys, time, requests, csv, re, prettytable, numpy as np, json, speedtest, pandas_market_calendars, arch
 import xml.etree.ElementTree as ET, traceback, speedtest, typing, chardet, pickle, filelock, yfinance, polygon, re
 import math, pandas as pd, psutil, gc#, dask.dataframe as dd
 from datetime import datetime, timedelta
@@ -160,6 +160,67 @@ def get_stock_currency_yf(symbol:str):
             return None, exchange
     except Exception as e:
         print(f"Could not fetch currency from Yahoo Finace. Error: {e}" + "  |  Full error: ", traceback.format_exc())
+
+
+def calculate_garch_volatility(price_data:pd.Series, p:int=1, q:int=1, forecast_horizon:int=1) -> float:
+    """
+    Calculate the volatility using a GARCH model.
+
+    :param price_data: A pandas Series of historical price data.
+    :param p: The order of the GARCH model (GARCH(p, q)).
+    :param q: The order of the GARCH model (GARCH(p, q)).
+    :param forecast_horizon: The number of steps ahead to forecast volatility.
+    :return: Forecasted volatility.
+    """
+    # Calculate returns
+    returns = price_data.pct_change().dropna() * 100  # Percentage returns
+    returns_scaled = returns * 10  # Scaling factor recommended to avoid model convergence issues
+
+    # Fit GARCH model
+    model = arch.arch_model(returns_scaled, vol='Garch', p=p, q=q)
+    model_fit = model.fit(disp="off")
+
+    # Forecast volatility for the next forecast_horizon periods
+    forecast = model_fit.forecast(horizon=forecast_horizon)
+    pred_vlty = forecast.variance.values[-1, 0]  # Forecasted variance for the last period
+    pred_vlty = np.sqrt(pred_vlty)  / 10  # Rescale the volatility  (Volatility is the square root of variance)
+
+    return pred_vlty
+
+
+def calculate_ewma_volatility(price_data:pd.Series, lambda_:float=0.94, prev_volatility:float=0.0) -> float:
+    """
+    Calculate the volatility using the EWMA method.
+
+    :param price_data: A pandas Series of historical price data.
+    :param lambda_: The smoothing factor (default is 0.94).
+    :param prev_volatility: The previous volatility value (default is 0.0 for the first period).
+    :return: Forecasted volatility.
+    """
+    # Calculate returns
+    returns = price_data.pct_change().dropna() * 100  # Percentage returns
+    squared_returns = returns ** 2
+
+    # Calculate the EWMA volatility
+    if prev_volatility == 0.0:  # If it's the first calculation, initialize volatility
+        volatility = np.sqrt(squared_returns.mean()).values[0]  # Use the mean of squared returns as initial volatility
+    else:
+        volatility = np.sqrt(lambda_ * squared_returns.iloc[-1] + (1 - lambda_) * prev_volatility ** 2).values[0]
+
+    return volatility
+
+
+def calculate_weighted_atr(atr_series:pd.Series, lambda_:float=0.94):
+    """
+    Calculate a weighted ATR using an exponential moving average (EMA).
+    
+    :param atr_series: The ATR series.
+    :param lambda_: The smoothing factor (default 0.94).
+    :return: The weighted ATR series.
+    """
+    # Apply the EMA to the ATR series
+    return atr_series.ewm(span=(2 / (1 - lambda_)) - 1, adjust=False).mean()
+
 
 
 

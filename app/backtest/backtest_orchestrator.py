@@ -1,4 +1,4 @@
-import os, sys, pandas as pd, datetime
+import os, sys, pandas as pd, datetime, traceback
 from dataclasses import dataclass
 from ib_insync import *
 
@@ -84,6 +84,10 @@ class BacktestOrchestrator:
         
         # Trim again to ensure it is trimmed
         df = helpers.trim_df(df, from_time=test_from, to_time=test_to)
+
+        # if 'garch_volatility' in self.strategy_required_columns and 'garch_volatility' not in df.columns:
+        #     df['garch_volatility'] = helpers.calculate_garch_volatility(df['close'])
+
         return df
 
     def select_engine(self, df, symbol):
@@ -130,7 +134,7 @@ class BacktestOrchestrator:
                 try:
                     self._run_backtest_engine(df, symbol)
                 except Exception as e:
-                    print(f"Could not run backtest for {symbol}. Error: {e}")#  |  Full error: ", traceback.format_exc())
+                    print(f"Could not run backtest for {symbol}. Error: {e}  |  Full error: ", traceback.format_exc())
                     failed_symbols.append(symbol)
             
             self.summarize_and_save(self.all_trades)
@@ -168,7 +172,7 @@ class BacktestOrchestrator:
                         try:
                             self._run_backtest_engine(df, symbol)
                         except Exception as e:
-                            print(f"Could not run backtest for {symbol}. Error: {e}")#  |  Full error: ", traceback.format_exc())
+                            print(f"Could not run backtest for {symbol}. Error: {e}  |  Full error: ", traceback.format_exc())
                             failed_symbols.append(symbol)
                     else:
                         print(f"❌ No data could be loaded for {symbol}")
@@ -212,7 +216,7 @@ if __name__ == "__main__":
 
 
     paperTrading = not 'live' in args
-    local_ib = 'local' in args
+    remote_ib = 'remote' in args
     revised = 'revised' in args
     # multpile_runs = 'multiple' in args
     seed = next((int(arg[5:]) for arg in args if arg.startswith('seed=')), None)
@@ -226,7 +230,7 @@ if __name__ == "__main__":
     selector = next((arg[9:] for arg in args if arg.startswith('selector=') and arg[9:] in ['rf', 'rfe', 'rfecv']), 'rf')
 
 
-    ib, _ = helpers.IBKRConnect_any(IB(), paper=paperTrading, remote=not local_ib)
+    ib, _ = helpers.IBKRConnect_any(IB(), paper=paperTrading, remote=remote_ib)
 
     symbols = [symbol] if symbol else []
     # symbols = ['ALL', 'CME']

@@ -39,6 +39,7 @@ class BacktraderStrategyWrapper(bt.Strategy):
         self.total_bars = self.p.total_bars
         self.df = self.p.df
         self.dropped_required_columns = self.p.dropped_required_columns
+        self.symbol = self.datas[0]._name
         self.status_counter = 0
         self.prev_row = None
         self.in_position = None
@@ -100,10 +101,10 @@ class BacktraderStrategyWrapper(bt.Strategy):
             print("⚠️ Trade not fully executed, skipping log.")
             return
         
-        symbol = self.datas[0]._name
+        # symbol = self.datas[0]._name
         trade_evaluator.TradeEvaluator.log_trade(self.manager.direction, self.trades, self.entry_idx, self.exit_idx, self.df, 
                                                  self.entry_price, self.exit_price, self.quantity, self.decision_prediction, 
-                                                 self.entry_prediction, self.active_stop_price, self.exit_reason, symbol, 
+                                                 self.entry_prediction, self.active_stop_price, self.exit_reason, self.symbol, 
                                                  self.entry_exec_price, self.exit_exec_price, self.entry_commission, self.exit_commission)
     
     def notify_order(self, order):
@@ -199,9 +200,10 @@ class BacktraderStrategyWrapper(bt.Strategy):
                 self.entry_prediction = curr_row['model_prediction']
                 self.quantity = self.manager.evaluate_quantity(self.entry_prediction)
                 self.order = self.execute_order('entry')
+                decision_row = self.manager.add_pred_vlty(curr_row, self.symbol)
 
                 # Resolve stop once here
-                self.active_stop_price = self.manager.resolve_stop_price(curr_row, self.active_stop_price)
+                self.active_stop_price = self.manager.resolve_stop_price(decision_row, self.active_stop_price)
 
                 # Set target entry time and price
                 if hasattr(self.manager.strategy_instance.target_handler, 'set_entry_time'):

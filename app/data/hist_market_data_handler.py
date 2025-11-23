@@ -739,7 +739,7 @@ if __name__ == "__main__":
     args = sys.argv
     action_list = ['fetch', 'complete', 'validate', 'load', 'enrich', 'convert']
     paperTrading = not 'live' in args
-    local_ib = 'local' in args
+    remote_ib = 'remote' in args
     override = 'override' in args
     delete_file = not 'nodelete' in args
     keep_results = 'keep' in args
@@ -757,7 +757,7 @@ if __name__ == "__main__":
     symbols = [single_symbol] if single_symbol else []
 
     # TWS Connection
-    ib, ibConnection = helpers.IBKRConnect_any(IB(), paper=paperTrading, remote=not local_ib)
+    ib, ibConnection = helpers.IBKRConnect_any(IB(), paper=paperTrading, remote=remote_ib)
     # ib=IB()
 
     if action == 'fetch':

@@ -80,7 +80,7 @@ class BacktraderBacktestEngine:
             df=self.df,
             dropped_required_columns = self.dropped_required_columns
         )
-        cerebro.broker.setcash(100000)
+        cerebro.broker.setcash(10000)
         cerebro.broker.addcommissioninfo(ib_comm)
         cerebro.broker.set_slippage_perc(perc=0.001) # 0.1%
         t_now = datetime.datetime.now()

@@ -143,9 +143,10 @@ if __name__ == "__main__":
     # Args Setup
     args = sys.argv
     paperTrading = not 'live' in args
+    remote_ib = 'remote' in args
     single_symbol = next((arg[7:] for arg in args if arg.startswith('symbol=')), None)
 
-    ib, ibConnection = helpers.IBKRConnect_any(IB(), paper=paperTrading)
+    ib, ibConnection = helpers.IBKRConnect_any(IB(), paper=paperTrading, remote=remote_ib)
     print()
     # # Example usage: Get market data for AAPL
     # get_stock_data('ACIW')
@@ -163,7 +164,8 @@ if __name__ == "__main__":
     path_df1 = "C:/Users/ChristopheReis/Documents/T/t_data/hist_data/PGNY/enriched_PGNY_df.parquet"
     path_df2 = "C:/Users/ChristopheReis/Documents/T/t_data/hist_data/PGNY/enriched_PGNY_df_tf.parquet"
 
-    path_df1 = "C:/Users/ChristopheReis/Documents/T/t_data/hist_data/ACIW/hist_data_ACIW_1D_2017-06-05-00-00-00_2025-10-08-00-00-00.parquet"
+    path_df1 = "C:/Users/ChristopheReis/Documents/T/t_data/hist_data/ACIW/enriched_data_ACIW_5min_2020-01-02-09-30-00_2025-10-08-12-00-00.parquet"
+    # path_df1 = "C:/Users/ChristopheReis/Documents/T/t_data/hist_data/ACIW/hist_data_ACIW_1D_2017-06-05-00-00-00_2025-10-08-00-00-00.parquet"
     # path_df2 = "C:/Users/ChristopheReis/Documents/T/t_data/hist_data/ACIW/enriched_data_ACIW_1min_2020-01-02-09-30-00_2025-10-08-16-00-00_merge_iteratively.parquet"
     path_df2 = "C:/Users/ChristopheReis/Documents/T/t_data/hist_data/ACIW/enriched_data_ACIW_15min_2020-01-02-09-30-00_2025-10-08-12-00-00.parquet"
 
@@ -183,6 +185,15 @@ if __name__ == "__main__":
     df1 = helpers.load_df_from_file(path_df1)
     # df1 = pd.read_parquet(path_df1)
     print(f"Elapsed time for loading df1: {datetime.datetime.now() - t_now}\n")
+
+    print("Loading df1 pandas")
+    t_now = datetime.datetime.now()
+    from features import indicators
+    ind = indicators.Indicators(df1, ib=ib, symbol='ACIW', types=['all'])
+    df = ind.apply_pred_vlty()
+    print(f"Elapsed time for predicted volatility: {datetime.datetime.now() - t_now}\n")
+    print()
+    input("++++++++++++++++++++++++++++++++")
 
     col_list = [col for col in df1.columns if '_list' in col]
     df1 = df1.drop(columns=col_list)

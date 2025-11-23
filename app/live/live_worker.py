@@ -195,7 +195,7 @@ if __name__ == "__main__":
     pd.options.mode.chained_assignment = None # Disable Pandas warnings
 
     paper_trading = not 'live' in args
-    local_ib = 'local' in args
+    remote_ib = 'remote' in args
     revised = 'revised' in args
     continuous = not 'snapshot' in args
     no_initialize = 'noinit' in args
@@ -218,7 +218,7 @@ if __name__ == "__main__":
     # trade_manager = trade_manager.TradeManager(IB(), strategy_name, stop, revised=revised)
 
     worker = LiveWorker(action=action, strategy_name=strategy_name, revised=revised, live_mode=mode, initialize=not no_initialize, 
-                              paper_trading=paper_trading, wait_seconds=wait_seconds, continuous=continuous, remote_ib=not local_ib)
+                              paper_trading=paper_trading, wait_seconds=wait_seconds, continuous=continuous, remote_ib=remote_ib)
     worker.run()
 
 
