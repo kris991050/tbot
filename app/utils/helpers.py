@@ -159,7 +159,8 @@ def get_stock_currency_yf(symbol:str):
             print(f"Unknown currency for {symbol}")
             return None, exchange
     except Exception as e:
-        print(f"Could not fetch currency from Yahoo Finace. Error: {e}" + "  |  Full error: ", traceback.format_exc())
+        print(f"Could not fetch currency from Yahoo Finance. Error: {e}" + "  |  Full error: ", traceback.format_exc())
+        return CONSTANTS.DEFAULT_CURRENCY
 
 
 def calculate_garch_volatility(price_data:pd.Series, p:int=1, q:int=1, forecast_horizon:int=1) -> float:
@@ -395,7 +396,7 @@ def change_file_format(file_path: typing.Union[str, os.PathLike], format_to: str
     return f"{base}.{new_extension}"
 
 
-def initialize_symbols_csv_file(file_csv_path, title_row):
+def initialize_log_csv_file(file_csv_path, title_row):
 
     # If CSV file does not exist, create it and write first title row
     if not os.path.exists(file_csv_path):
@@ -571,7 +572,7 @@ def save_to_daily_csv(ib, symbols, file_name):
     symbols_csv_path = os.path.join(daily_data_folder, file_name)
 
     if symbols:
-        initialize_symbols_csv_file(symbols_csv_path, ['Time', 'Symbol', 'Avg Volume', 'Rel Volume', 'Floats', 'Market Cap', 'Index', 'Last Earning', 'News'])
+        initialize_log_csv_file(symbols_csv_path, ['Time', 'Symbol', 'Avg Volume', 'Rel Volume', 'Floats', 'Market Cap', 'Index', 'Last Earning', 'News'])
 
         # Record existing symbols from file
         symbols_existing = []
@@ -584,21 +585,25 @@ def save_to_daily_csv(ib, symbols, file_name):
             file_writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
             for symbol in symbols:
                 if symbol not in symbols_existing:
-                    avg_volume, rel_volume, floats, index, last_earning_date, news = '', '', '', '', '', []
-                    try:
-                        avg_volume, rel_volume, floats, market_cap = get_volumes_from_Finviz(symbol)
+                    infos = get_symbol_infos(ib, symbol)
+                    # avg_volume, rel_volume, floats, index, last_earning_date, news = '', '', '', '', '', []
+                    # try:
+                    #     avg_volume, rel_volume, floats, market_cap = get_volumes_from_Finviz(symbol)
 
-                        index = get_index_from_symbol(ib, symbol)
-                        if not index: index = get_stock_info_from_Finviz(symbol, 'Index')
+                    #     index = get_index_from_symbol(ib, symbol)
+                    #     if not index: index = get_stock_info_from_Finviz(symbol, 'Index')
 
-                        last_earning_date = get_stock_info_from_Finviz(symbol, 'Earnings')
+                    #     last_earning_date = get_stock_info_from_Finviz(symbol, 'Earnings')
 
-                        newsList = newsScraper.getNewsFinviz(symbol, max_days=1, date_range=None)
-                        news = newsList[0]['news'] if len(newsList) > 0 else ''
+                    #     newsList = newsScraper.getNewsFinviz(symbol, max_days=1, date_range=None)
+                    #     news = newsList[0]['news'] if len(newsList) > 0 else ''
 
-                    except Exception as e: print("Could not fetch infos from Finviz for symbol ", symbol, ". Error: ", e)
-                    print("Adding symbol ", symbol, "\nAvg Vol: ", avg_volume, "\nRel Vol: ", rel_volume, "\nFloats: ", floats, "\nMarket Cap: ", market_cap, "\nIndex: ", index, "\nLast Earning Date: ", last_earning_date, "\nNews: ", news, "\nto: ", symbols_csv_path)
-                    file_writer.writerow([date_now.strftime('%Y-%m-%dT%H:%M:%S'), symbol, avg_volume, rel_volume, floats, market_cap, index, last_earning_date, news])
+                    # except Exception as e: print("Could not fetch infos from Finviz for symbol ", symbol, ". Error: ", e)
+                    print("Adding symbol ", symbol, "\nAvg Vol: ", infos['avg_volume'], "\nRel Vol: ", infos['rel_volume'], "\nFloats: ", \
+                          infos['floats'], "\nMarket Cap: ", infos['market_cap'], "\nIndex: ", infos['index'], "\nLast Earning Date: ", \
+                            infos['last_earning_date'], "\nNews: ", infos['news'], "\nto: ", symbols_csv_path)
+                    file_writer.writerow([date_now.strftime('%Y-%m-%dT%H:%M:%S'), symbol, infos['avg_volume'], infos['rel_volume'], infos['floats'], \
+                                          infos['market_cap'], infos['index'], infos['last_earning_date'], infos['news']])
 
         print("\nSaved symbols at ", symbols_csv_path, "\n")
         file.close()
@@ -769,7 +774,6 @@ def get_index_from_symbol(ib, symbol):
 
 
 def get_tick_value(price):
-
      return  10 ** -int(str(price)[::-1].find('.'))
 
 
@@ -831,6 +835,22 @@ def get_share_floats_from_polygon(symbol):
     pclient = polygon.RESTClient(api_key=CONSTANTS.POLYGON_API_KEY)
     return pclient.get_ticker_details(symbol).share_class_shares_outstanding
 
+
+def get_symbol_infos(ib:IB, symbol:str):
+    avg_volume, rel_volume, floats, index, last_earning_date, news = '', '', '', '', '', []
+    try:
+        avg_volume, rel_volume, floats, market_cap = get_volumes_from_Finviz(symbol)
+
+        index = get_index_from_symbol(ib, symbol)
+        if not index: index = get_stock_info_from_Finviz(symbol, 'Index')
+
+        last_earning_date = get_stock_info_from_Finviz(symbol, 'Earnings')
+
+        newsList = newsScraper.getNewsFinviz(symbol, max_days=1, date_range=None)
+        news = newsList[0]['news'] if len(newsList) > 0 else ''
+
+    except Exception as e: print("Could not fetch infos from Finviz for symbol ", symbol, ". Error: ", e)
+    return {'avg_volume': avg_volume, 'rel_volume': rel_volume, 'floats': floats, 'market_cap': market_cap, 'index': index, 'last_earning_date': last_earning_date, 'news': news}
 
 def get_symbol_contract(ib, symbol, currency="USD", exchange=None):
 

@@ -356,7 +356,7 @@ class StopLossHandler(ABC):
     def check_stop_loss(self, curr_row:pd.Series, stop_price:pd.Series, direction:int) -> Optional[str]:
         close = curr_row['close']
         if (direction == 1 and close <= stop_price) or (direction == -1 and close >= stop_price):
-            return f"{self.stop_type.capitalize()}"
+            return f"{self.stop_type}"#.capitalize()}"
         return None
 
 

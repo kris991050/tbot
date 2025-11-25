@@ -5,7 +5,8 @@ from ib_insync import *
 current_folder = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(current_folder)
 
-from utils import helpers, constants
+from utils import helpers
+from utils.constants import CONSTANTS, PATHS
 from features import indicators
 from data import hist_market_data_handler
 
@@ -554,8 +555,8 @@ if __name__ == "__main__":
     pd.options.mode.chained_assignment = None # Disable Pandas warnings
 
     symbol = 'TSLA'
-    to_time = pd.to_datetime('2025-05-06T19:59:59').tz_localize(constants.CONSTANTS.TZ_WORK)
-    from_time = pd.to_datetime('2023-01-01T04:00:00').tz_localize(constants.CONSTANTS.TZ_WORK)
+    to_time = pd.to_datetime('2025-05-06T19:59:59').tz_localize(CONSTANTS.TZ_WORK)
+    from_time = pd.to_datetime('2023-01-01T04:00:00').tz_localize(CONSTANTS.TZ_WORK)
     timeframe_1D = '1day'
     timeframe_1m = '1min'
     timeframe_5m = '5mins'
@@ -577,8 +578,8 @@ if __name__ == "__main__":
 
 
     # Setup
-    hist_folder = constants.PATHS.folders_path['hist_market_data']
-    market_data_folder = constants.PATHS.folders_path['market_data']
+    hist_folder = PATHS.folders_path['hist_market_data']
+    market_data_folder = PATHS.folders_path['market_data']
 
     symbol_hist_folder = os.path.join(hist_folder, symbol)
     print("\nSymbol Hist Data folder: ", symbol_hist_folder, "\n")
@@ -590,7 +591,7 @@ if __name__ == "__main__":
 
     # Make sure date column is in datetime format
     df_1m['date'] = pd.to_datetime(df_1m['date'], utc=True)
-    df_1m['date'] = df_1m['date'].dt.tz_convert(constants.CONSTANTS.TZ_WORK)
+    df_1m['date'] = df_1m['date'].dt.tz_convert(CONSTANTS.TZ_WORK)
 
 
     # Trimming df to desired time interval
@@ -599,7 +600,7 @@ if __name__ == "__main__":
     df_5m = df_1m.resample('5min', on='date').agg({'open':'first', 'high':'max', 'low':'min', 'close':'last', 'volume':'sum'}).dropna().reset_index()
     df_15m = df_1m.resample('15min', on='date').agg({'open':'first', 'high':'max', 'low':'min', 'close':'last', 'volume':'sum'}).dropna().reset_index()
     df_1D = df_1m.resample('1D', on='date').agg({'open':'first', 'high':'max', 'low':'min', 'close':'last', 'volume':'sum'}).dropna().reset_index()
-    contract, mktData = helpers.get_symbol_mkt_data(ib, symbol, currency='USD')
+    contract, mktData = helpers.get_symbol_mkt_data(ib, symbol, currency=CONSTANTS.DEFAULT_CURRENCY)
     df_5m_ind = indicators.Indicators(df_5m, ib, contract, types=['volatility', 'momentum'], bb_window=10).apply_indicators()
     df_15m_ind = indicators.Indicators(df_15m, ib, contract, types=['volatility', 'momentum']).apply_indicators()
     df_1m_ind = indicators.Indicators(df_1m, ib, contract, types=['volatility', 'momentum']).apply_indicators()

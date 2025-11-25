@@ -1,4 +1,4 @@
-import os, sys
+import os, sys, csv
 from ib_insync import *
 
 parent_folder = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -38,7 +38,7 @@ class LiveDataLogger:
         }
         live_log_file_name = f"live_log_{self.worker_type}_{date_now.strftime("%Y-%m-%d_%H-%M-%S")}{sim_str}.txt"
         self.live_log_file_path = os.path.join(logs_folder, live_log_file_name)
-        trade_log_file_name = f"trade_log_{date_now.strftime("%Y-%m-%d_%H-%M-%S")}{sim_str}.txt"
+        trade_log_file_name = f"trade_log_{date_now.strftime("%Y-%m-%d")}{sim_str}.csv"
         self.trade_log_file_path = os.path.join(logs_folder, trade_log_file_name)
         self.default_priority = 2
 
@@ -146,6 +146,24 @@ class LiveDataLogger:
         except IndexError as e:
             print(f"⚠️ Error popping from the queue: {e}")
             return None
+            
+    def save_to_trade_log_csv(self, ib, time_order, symbol, row, quantity, target_price, stop_price, order_status, order_avg_fill, required_columns):
+        required_columns_trimmed = [col for col in required_columns if col in row.index]
+
+        helpers.initialize_log_csv_file(self.trade_log_file_path, ['Entry Time', 'Symbol', 'Close', 'Quantity', 'Target', 'Stop', 'Prediction', \
+                                                                   'Order Status', 'Order Avg Fill', *required_columns_trimmed, 'Avg Volume', 'Rel Volume', 'Floats', \
+                                                                    'Market Cap', 'Index', 'Last Earning', 'News'])
+
+        with open(self.trade_log_file_path, mode='a') as file:
+            infos = helpers.get_symbol_infos(ib, symbol)
+            file_writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+            file_writer.writerow([time_order, symbol, row['close'], quantity, target_price, stop_price, row['model_prediction'], \
+                                  order_status, order_avg_fill, *row[required_columns_trimmed].to_list(), infos['avg_volume'], \
+                                    infos['rel_volume'], infos['floats'], infos['market_cap'], infos['index'], \
+                                        infos['last_earning_date'], infos['news']])
+        print(f"💾 Logged trade with symbol {symbol}, quantity {quantity}, close price {row['close']}, target price {target_price}, stop price {stop_price}, prediction {row['model_prediction']} at {self.trade_log_file_path}")
+
+        file.close()
 
 
 

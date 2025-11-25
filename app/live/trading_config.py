@@ -29,7 +29,7 @@ class TradingConfig:
         self.max_time_factor: int = 50
         self.max_loss_perc: int = 1
         self.partial_perc: int = 10
-        self.default_currency: str = 'USD'
+        self.default_currency: str = CONSTANTS.DEFAULT_CURRENCY
         self.pred_vlty_type: str = 'garch' # 'ewma'
         self.volatility_factor: int = 2
 

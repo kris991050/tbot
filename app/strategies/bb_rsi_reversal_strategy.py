@@ -169,8 +169,8 @@ class BBRSIReversalStrategy(base_strategy.BaseStrategy):
     
     @staticmethod
     def _scan_bb_rsi_reversal(now, timezone=CONSTANTS.TZ_WORK):
-        # if not helpers.is_between_market_times('pre-market', 'end_of_tday', now=now, timezone=timezone):
-        #     return []
+        if not helpers.is_between_market_times('pre-market', 'end_of_tday', now=now, timezone=timezone):
+            return []
         print('\n======== FETCHING RSI REVERSALS ========\n')
         symbols, _ = scanner.scannerTradingView("RSI-Reversal")
         return symbols

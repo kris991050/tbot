@@ -92,7 +92,7 @@ class DomL2:
         self.sum_table.title = "SUMs " + self.symbol + '     ' + str(self.date)
         self.full_dom_table.title = "FULL DOM " + self.symbol + '     ' + str(self.date)
 
-    def get_dom(self, currency='USD'):
+    def get_dom(self, currency=CONSTANTS.DEFAULT_CURRENCY):
         contract, mktData = helpers.get_symbol_mkt_data(self.ib, self.symbol, currency=currency)#, exchange="NASDAQ")
         MD = self.ib.reqMktDepth(contract, numRows=2000, isSmartDepth=True, mktDepthOptions=None)
         self.ib.sleep(CONSTANTS.PROCESS_TIME['long'])
@@ -226,7 +226,7 @@ class DomL2:
             os.mkdir(self.data_folder)
             print(f"Directory '{self.data_folder}' created successfully.")
 
-        helpers.initialize_symbols_csv_file(dataL2_csv_file, ['Time', 'Symbol', 'Score levels', '% Levels', 'N Levels Bids', 'N Levels Asks', 'Levels Bids', 'Levels Asks', 'Score Sum', '% Sum', 'Sum Bids', 'Sum Asks', 'Score Direct', '% Direct', 'Direct Bids', 'Direct Asks'])
+        helpers.initialize_log_csv_file(dataL2_csv_file, ['Time', 'Symbol', 'Score levels', '% Levels', 'N Levels Bids', 'N Levels Asks', 'Levels Bids', 'Levels Asks', 'Score Sum', '% Sum', 'Sum Bids', 'Sum Asks', 'Score Direct', '% Direct', 'Direct Bids', 'Direct Asks'])
 
         with open(dataL2_csv_file, mode='a') as file:
             journal_writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
@@ -319,7 +319,7 @@ if __name__ == "__main__":
     args = sys.argv
 
     symbol = 'TSLA'
-    currency = 'USD'
+    currency = CONSTANTS.DEFAULT_CURRENCY
     dummy = False
     full_dom = False
     time_wait = 5*60

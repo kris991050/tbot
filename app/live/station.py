@@ -7,7 +7,8 @@ parent_folder = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_folder)
 
 from execution import trade_executor, orders
-from utils import helpers, constants
+from utils import helpers
+from utils.constants import CONSTANTS
 
 
 def execute_order(ib, direction, values, simple_order=False):
@@ -104,7 +105,7 @@ def partial(ib, values, perc):
         bo_list, TP_orders, SL_orders = orders.record_bracket(ib, contract)
         print('Closing all orders for symbol ', values_copy['-symbol-'], '\n')
         orders.cancel_orders_by_symbol(ib, values_copy['-symbol-'])
-        ib.sleep(constants.CONSTANTS.PROCESS_TIME['short'])
+        ib.sleep(CONSTANTS.PROCESS_TIME['short'])
 
         print('\nPosition found: ', position, '\n')
         values_copy['-symbol-'] = position[0].contract.localSymbol if position[0].contract.localSymbol else position[0].contract.symbol
@@ -113,7 +114,7 @@ def partial(ib, values, perc):
             direction = 1 if values_copy['-quantity-'] < 0 else -1
             print('Partiallinig position for symbol ', values_copy['-symbol-'])
             execute_order(ib, direction, values_copy, simple_order=True)
-            ib.sleep(constants.CONSTANTS.PROCESS_TIME['short'])
+            ib.sleep(CONSTANTS.PROCESS_TIME['short'])
 
             print('\nRecreating brackets...')
             orders.recreate_bracket(ib, contract, bo_list, qty_factor=perc/100, TP=None, SL=None)
@@ -143,7 +144,7 @@ def close_position(ib, values, partial=100):
             text_close = 'Closing' if partial == 100 else 'Partialling'
             print(text_close, ' position for symbol ', values_copy['-symbol-'])
             execute_order(ib, direction, values_copy, simple_order=True)
-            ib.sleep(constants.CONSTANTS.PROCESS_TIME['short'])
+            ib.sleep(CONSTANTS.PROCESS_TIME['short'])
 
             print()
     else:
@@ -400,7 +401,7 @@ def reset_values(values, keep_after_order=False, store_file=None):
 
     if not use_store_file:
         reset_values = {'-symbol-': values['-symbol-'] if keep_after_order else '',
-                      '-currency-': values['-currency-'] if keep_after_order else 'USD',
+                      '-currency-': values['-currency-'] if keep_after_order else CONSTANTS.DEFAULT_CURRENCY,
                       '-take_profit-': '',
                       '-profit_ratio-': '',
                       '-stop_loss-': '',
@@ -920,7 +921,7 @@ if __name__ == '__main__':
 #         bo_list, TP_orders, SL_orders = orders.record_bracket(ib, contract)
 #         print('Closing all orders for symbol ', values_copy['-symbol-'], '\n')
 #         orders.cancel_orders_by_symbol(ib, values_copy['-symbol-'])
-#         ib.sleep(constants.CONSTANTS.PROCESS_TIME['short'])
+#         ib.sleep(CONSTANTS.PROCESS_TIME['short'])
 
 #         print('\nPosition found: ', position, '\n')
 #         values_copy['-symbol-'] = position[0].contract.localSymbol if position[0].contract.localSymbol else position[0].contract.symbol
@@ -929,7 +930,7 @@ if __name__ == '__main__':
 #             direction = 1 if values_copy['-quantity-'] < 0 else -1
 #             print('Partiallinig position for symbol ', values_copy['-symbol-'])
 #             execute_order(ib, direction, values_copy, simple_order=True)
-#             ib.sleep(constants.CONSTANTS.PROCESS_TIME['short'])
+#             ib.sleep(CONSTANTS.PROCESS_TIME['short'])
 
 #             print('\nRecreating brackets...')
 #             orders.recreate_bracket(ib, contract, bo_list, qty_factor=perc/100, TP=None, SL=None)
@@ -970,7 +971,7 @@ if __name__ == '__main__':
 #             text_close = 'Closing' if partial == 100 else 'Partialling'
 #             print(text_close, ' position for symbol ', values_copy['-symbol-'])
 #             execute_order(ib, direction, values_copy, simple_order=True)
-#             ib.sleep(constants.CONSTANTS.PROCESS_TIME['short'])
+#             ib.sleep(CONSTANTS.PROCESS_TIME['short'])
 
 #             # print('Closing all orders for symbol ', values_copy['-symbol-'], '\n')
 #             # orders.cancel_orders_by_symbol(ib, values_copy['-symbol-'])

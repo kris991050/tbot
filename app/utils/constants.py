@@ -35,6 +35,8 @@ class CONSTANTS():
         TZ_LOCAL = pytz.timezone('US/Pacific')
         # TZ_LOCAL = pytz.timezone(tzlocal.get_localzone().key if hasattr(tzlocal.get_localzone(), 'key') else str(tzlocal.get_localzone()))
 
+        DEFAULT_CURRENCY = 'USD'
+        
         POLYGON_API_KEY = os.getenv('POLYGON_API_KEY')
         POLYGON_DATA_DELAY = '15min'
         POLYGON_DATA_MAX_BACKWARD = '5Y'

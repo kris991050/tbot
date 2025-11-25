@@ -1,7 +1,9 @@
-import os, sys, numpy as np, datetime, math, csv, pytz, prettytable, traceback, pandas as pd
+import os, sys, csv, pytz, prettytable, traceback, pandas as pd
+from datetime import datetime, timedelta
 from collections import defaultdict
 from ib_insync import *
-from utils import helpers, constants
+from utils import helpers
+from utils.constants import CONSTANTS
 
 
 def get_symbols(csv_path):
@@ -26,7 +28,7 @@ class TimeNSales:
 
     __slots__ = ('ib', 'symbol', 'data_folder', 'ts', 'ba', 'ts_aggregated', 'ts_aggregated_by_time_window', 'ts_sign_levels', 'ts_table', 'timezone')
 
-    def __init__(self, ib, symbol, data_folder, timezone=pytz.timezone(constants.CONSTANTS.TZ_WORK)):
+    def __init__(self, ib, symbol, data_folder, timezone=pytz.timezone(CONSTANTS.TZ_WORK)):
         self.ib = ib
         self.symbol = symbol.upper()
         self.data_folder = data_folder
@@ -39,7 +41,7 @@ class TimeNSales:
         self.ts_table = prettytable.PrettyTable()
 
 
-    def reqHistTicks(self, type_data, time_periods, numTicks=1000, round_deg=4, currency='USD', time_window=None):
+    def reqHistTicks(self, type_data, time_periods, numTicks=1000, round_deg=4, currency=CONSTANTS.DEFAULT_CURRENCY, time_window=None):
         contract, mktData = helpers.get_symbol_mkt_data(self.ib, self.symbol, currency=currency)#, exchange="NASDAQ")
         if type_data == 'ticks': whatToShow = "TRADES" if contract.symbol not in helpers.get_forex_symbols_list() else "MIDPOINT"
         elif type_data == 'bid_ask': whatToShow = 'BID_ASK'
@@ -60,7 +62,7 @@ class TimeNSales:
                     print("\rRemaining: {}".format(end_time_loop - start_time), end='')
 
                     data = ib.reqHistoricalTicks(contract=contract, startDateTime=start_time, endDateTime=end_time, numberOfTicks=numTicks, whatToShow=whatToShow, useRth=False)
-                    ib.sleep(constants.CONSTANTS.PROCESS_TIME['short'])
+                    ib.sleep(CONSTANTS.PROCESS_TIME['short'])
 
                     if type_data == 'ticks':
                         #self.ts += data
@@ -74,9 +76,9 @@ class TimeNSales:
                     if not condition_loop: break
 
 
-                    if time_end_df == start_time: start_time += datetime.timedelta(seconds=1)
+                    if time_end_df == start_time: start_time += timedelta(seconds=1)
                     else: start_time = time_end_df
-                    # if self.ts[-1].time == start_time: start_time += datetime.timedelta(seconds=1)
+                    # if self.ts[-1].time == start_time: start_time += timedelta(seconds=1)
                     # else: start_time = self.ts[-1].time
 
             except Exception as e: print("Could not get historical ticks. Error: ", e, "  |  Full error: ", traceback.format_exc())
@@ -194,14 +196,14 @@ if __name__ == "__main__":
     ib, ibConnection = helpers.IBKRConnect(IB(), paper=paperTrading)
 
     if not stream:
-        time_periods = [{'start_time': helpers.date_to_EST_aware(datetime.datetime(2025, 2, 28, 13, 56, 00)), 'end_time': helpers.date_to_EST_aware(datetime.datetime(2025, 2, 28, 13, 58, 00))},
-                       {'start_time': helpers.date_to_EST_aware(datetime.datetime(2025, 2, 28, 13, 50, 00)), 'end_time': helpers.date_to_EST_aware(datetime.datetime(2025, 2, 28, 13, 53, 00))},
-                       {'start_time': helpers.date_to_EST_aware(datetime.datetime(2025, 2, 27, 13, 1, 00)), 'end_time': helpers.date_to_EST_aware(datetime.datetime(2025, 2, 27, 13, 5, 00))}]
+        time_periods = [{'start_time': helpers.date_to_EST_aware(datetime(2025, 2, 28, 13, 56, 00)), 'end_time': helpers.date_to_EST_aware(datetime(2025, 2, 28, 13, 58, 00))},
+                       {'start_time': helpers.date_to_EST_aware(datetime(2025, 2, 28, 13, 50, 00)), 'end_time': helpers.date_to_EST_aware(datetime(2025, 2, 28, 13, 53, 00))},
+                       {'start_time': helpers.date_to_EST_aware(datetime(2025, 2, 27, 13, 1, 00)), 'end_time': helpers.date_to_EST_aware(datetime(2025, 2, 27, 13, 5, 00))}]
 
-        time_periods = [{'start_time': helpers.date_to_EST_aware(datetime.datetime(2025, 4, 9, 4, 30, 00)), 'end_time': helpers.date_to_EST_aware(datetime.datetime(2025, 4, 9, 19, 30, 0))}]
-        # end_time = helpers.date_to_EST_aware(datetime.datetime.now())
+        time_periods = [{'start_time': helpers.date_to_EST_aware(datetime(2025, 4, 9, 4, 30, 00)), 'end_time': helpers.date_to_EST_aware(datetime(2025, 4, 9, 19, 30, 0))}]
+        # end_time = helpers.date_to_EST_aware(datetime.now())
 
-        time_now_start = datetime.datetime.now()
+        time_now_start = datetime.now()
 
         ticks_list = TimeNSales(ib, symbol, data_folder=daily_data_folder)
         ticks_list.reqHistTicks('ticks', time_periods, numTicks=1000, round_deg=2, time_window=time_window)
@@ -223,7 +225,7 @@ if __name__ == "__main__":
         if not lev3.empty : print(lev3.to_string())
         print()
 
-        time_now_end = datetime.datetime.now()
+        time_now_end = datetime.now()
         print("\nTime elapsed: ", time_now_end - time_now_start)
 
     elif stream:

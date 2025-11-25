@@ -416,11 +416,14 @@ class HistMarketDataEnricher:
         """Ensure dates match exactly and no gaps are introduced."""
         orig_dates = df_original['date'].sort_values().reset_index(drop=True)
         enrich_dates = df_enriched['date'].sort_values().reset_index(drop=True)
-
-        if not orig_dates.equals(enrich_dates):
-            raise ValueError(f"❌ Date mismatch or gaps found in enriched data: {filename}")
+        condition_equal = orig_dates.equals(enrich_dates)
+        if not condition_equal:
+            print(f"❌ Date mismatch or gaps found in enriched data: {filename}")
+            # raise ValueError(f"❌ Date mismatch or gaps found in enriched data: {filename}")
         else:
             print(f"✅ Date alignment validation successful for {filename}")
+
+        return condition_equal
 
     def _resample_if_needed(self, df:pd.DataFrame, timeframe:Timeframe):
         if self.handler.timeframe != self.base_handler.timeframe:
@@ -537,11 +540,14 @@ class HistMarketDataEnricher:
 
                     df_enriched = self.handler._update_attrs_times(df_enriched)
                     self._remove_path(path_existing_enriched)
-                    self._validate_dates_alignment(self._resample_if_needed(df_base, self.handler.timeframe), df_enriched, filename)
-                    fb.save(df_enriched)
-                    enriched_path = self._build_enriched_path(df_enriched, symbol)
-                    
-                    print(f"✅ Enrichment updated with {len(df_enriched_recent)} new bars.")
+                    if self._validate_dates_alignment(self._resample_if_needed(df_base, self.handler.timeframe), df_enriched, filename):
+                        fb.save(df_enriched)
+                        enriched_path = self._build_enriched_path(df_enriched, symbol)
+                        print(f"✅ Enrichment updated with {len(df_enriched_recent)} new bars.")
+                    else:
+                        df_enriched = pd.DataFrame()
+                        enriched_path = None
+
                     print(f"⏱️ Time enrichment completion of {symbol}: {datetime.now() - t0}")
                     return df_enriched, enriched_path
 
@@ -549,13 +555,17 @@ class HistMarketDataEnricher:
 
         # Resample if necessary
         df_resampled = self._resample_if_needed(df_base, self.handler.timeframe)
-        df_enriched, fb = self._add_features(df_resampled, symbol, self.save_to_file)
+        df_enriched, fb = self._add_features(df_resampled, symbol, save_to_file=False)
         df_enriched = self.handler._update_attrs_times(df_enriched)
         self._remove_path(path_existing_enriched)
-        self._validate_dates_alignment(df_resampled, df_enriched, filename)
-        enriched_path = self._build_enriched_path(df_enriched, symbol)
+        if self._validate_dates_alignment(df_resampled, df_enriched, filename):
+            fb.save(df_enriched)
+            enriched_path = self._build_enriched_path(df_enriched, symbol)
+            print(f"✅ Enrichment completed and validated for {symbol}")
+        else:
+            df_enriched = pd.DataFrame()
+            enriched_path = None
 
-        print(f"✅ Enrichment completed and validated for {symbol}")
         print(f"⏱️ Time for enrichment of {symbol}: {datetime.now() - t0}")
 
         return df_enriched, enriched_path
@@ -627,10 +637,14 @@ class HistMarketDataLoader:
                 return os.path.join(self.symbol_hist_folder, file)
             # if f"{self.data_type}_{self.symbol}_{self.handler.timeframe}_" in file and file.endswith(f".{self.handler.file_format}"):
             #     return os.path.join(self.symbol_hist_folder, file)
-        raise FileNotFoundError(f"No file found for {self.symbol} at {self.handler.timeframe} in {self.symbol_hist_folder}")
+        print(f"❌ No file found for {self.symbol} at {self.handler.timeframe} in {self.symbol_hist_folder}")
+        return None
+        # raise FileNotFoundError(f"❌ No file found for {self.symbol} at {self.handler.timeframe} in {self.symbol_hist_folder}")
 
     def load_and_trim(self, from_time=None, to_time=None) -> pd.DataFrame:
         file_path = self._get_hist_file()
+        if not file_path:
+            return pd.DataFrame(), None
 
         print(f"🔄 Loading data for {self.symbol}...")
         df = helpers.load_df_from_file(file_path)

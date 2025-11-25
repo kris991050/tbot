@@ -67,6 +67,9 @@ class LiveWorker(live_loop_base.LiveLoopBase):
 
     def _evaluate_entry(self, symbol):
         df = self._load_symbol_data(symbol)
+        if df.empty:
+            print(f"⚠️ No data could be loaded for {symbol}")
+            return False, pd.Series()
         df = self.manager.apply_model_predictions(df, symbol)
         last_row = df.iloc[-1]
         stop_price = self.manager.resolve_stop_price(last_row)
@@ -96,43 +99,50 @@ class LiveWorker(live_loop_base.LiveLoopBase):
 
     def _execute_symbol(self, symbol):
         # logging.basicConfig(filename=self.logger.trade_log_file_path, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s' )
-        with logs.LogContext(self.logger.trade_log_file_path, overwrite=True):  # Logging trades specifically in separate trade log
+        # with logs.LogContext(self.logger.trade_log_file_path, overwrite=True):  # Logging trades specifically in separate trade log
         
-            entry_condition, last_row = self._evaluate_entry(symbol)
-            if entry_condition:
-                print(f"Executing Order for {symbol}")
-                stop_price = self.manager.resolve_stop_price(last_row)
-                # target_price = last_row[self.manager.strategy_instance.params['target_indicator']] if self.manager.strategy_instance.params['target_indicator'] else ''
-                # Set target entry time and price
-                self.manager.set_target_for_entry(row=last_row, stop_price=stop_price, symbol=symbol)
-                target_price = self.manager.strategy_instance.target_handler.target_price
-                quantity = self.manager.evaluate_quantity(last_row['model_prediction'])
-                # values = self._create_trade_params(symbol, stop_price, target_price, quantity)
-                open_position = orders.get_positions_by_symbol(self.ib, symbol)
+        entry_condition, last_row = self._evaluate_entry(symbol)
+        if entry_condition:
+            print(f"Executing Order for {symbol}")
+            stop_price = self.manager.resolve_stop_price(last_row)
+            # target_price = last_row[self.manager.strategy_instance.params['target_indicator']] if self.manager.strategy_instance.params['target_indicator'] else ''
+            # Set target entry time and price
+            self.manager.set_target_for_entry(row=last_row, stop_price=stop_price, symbol=symbol)
+            target_price = self.manager.strategy_instance.target_handler.target_price
+            quantity = self.manager.evaluate_quantity(last_row['model_prediction'])
+            # values = self._create_trade_params(symbol, stop_price, target_price, quantity)
 
+            open_position = orders.get_positions_by_symbol(self.ib, symbol)
+
+            if not open_position:
                 oorder = trade_executor.OOrder(symbol=symbol, stop_loss=stop_price, take_profit=target_price, quantity=quantity, config=self.config)
-                if not open_position:
-                    order, TPSL_order = self.executor.execute_order(self.manager.direction, oorder)
-                    self.ib.sleep(CONSTANTS.PROCESS_TIME['long'])
-
-                if order is not None and hasattr(order, 'orderStatus'):
-                    print(f"Order placed with status {order.orderStatus.status}")
-                    # print(TPSL_order.orderStatus.status)
-                    if order.orderStatus.status in ['Filled', 'Submitted']:
-                        # Log order execution
-                        message = f"Executed order for {symbol} with quantity: {quantity}, stop price: {stop_price}, target price: {target_price}, model prediction: {last_row['model_prediction']}."
-                        # logging.info(message)
-                        print(message)
-                        self.tickers_list = self.logger.update_ticker(symbol, 'priority', 4, lock=True, log=True)
-                    
-                    open_position = orders.get_positions_by_symbol(self.ib, symbol)
-                    print(open_position)
-                else:
-                    print(f"Could not execute order for {symbol}")
-
-                return last_row.to_frame().T
+                order, TPSL_order = self.executor.execute_order(self.manager.direction, oorder)
+                now = helpers.calculate_now(self.config.sim_offset, self.config.timezone)
+                self.ib.sleep(CONSTANTS.PROCESS_TIME['long'])
+                order_status = order.orderStatus.status if hasattr(order, 'orderStatus') else None
+                order_avg_fill_price = order.orderStatus.avgFillPrice if hasattr(order, 'orderStatus') else None
+                self.logger.save_to_trade_log_csv(self.ib, now, symbol, last_row, quantity, target_price, stop_price, order_status, order_avg_fill_price,  self.manager.get_required_columns())
             else:
-                return pd.DataFrame()
+                order = None
+
+            if order is not None and order_status:
+                print(f"Order placed with status {order_status}")
+                # print(TPSL_order.orderStatus.status)
+                if order_status in ['Filled', 'Submitted']:
+                    # Log order execution
+                    message = f"Executed order for {symbol} with quantity: {quantity}, stop price: {stop_price}, target price: {target_price}, model prediction: {last_row['model_prediction']}."
+                    # logging.info(message)
+                    print(message)
+                    self.tickers_list = self.logger.update_ticker(symbol, 'priority', 4, lock=True, log=True)
+                
+                open_position = orders.get_positions_by_symbol(self.ib, symbol)
+                print(f"Open position: {open_position}")
+            else:
+                print(f"Could not execute order for {symbol} or already existing open position.")
+
+            return last_row.to_frame().T
+        else:
+            return pd.DataFrame()
 
     def _run(self):
         df = pd.DataFrame()
@@ -187,8 +197,9 @@ class LiveWorker(live_loop_base.LiveLoopBase):
             
             self.tickers_list = self.logger.update_ticker(symbol, f'{self.action}ing', False, lock=True, log=True)
 
-            if not df.empty:
-                self.tickers_list = self.logger.update_ticker(symbol, f'last_{self.action}ed', df['date'].iloc[-1], lock=True, log=True)
+            # if not df.empty:
+            date_action = df['date'].iloc[-1] if not df.empty else helpers.calculate_now(self.config.sim_offset, self.config.timezone)
+            self.tickers_list = self.logger.update_ticker(symbol, f'last_{self.action}ed', date_action, lock=True, log=True)
 
         return df
     

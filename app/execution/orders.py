@@ -3,7 +3,8 @@ from ib_insync import *
 parent_folder = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_folder)
 
-from utils import helpers, constants
+from utils import helpers
+from utils.constants import CONSTANTS
 
 # Example for Forex: https://github.com/erdewit/ib_insync/blob/master/notebooks/ordering.ipynb
 #                    https://github.com/erdewit/ib_insync/blob/master/notebooks/tick_data.ipynb
@@ -150,7 +151,7 @@ def get_bracket_orders(ib, contract, action):
     # for order in open_orders:
     #     print('open_orders = ', order, "\n")
     # input()
-    ib.sleep(constants.CONSTANTS.PROCESS_TIME['short'])
+    ib.sleep(CONSTANTS.PROCESS_TIME['short'])
 
     SL_orders = [order for order in open_orders if order.orderType == "STP" and order.action == action]# and order.parentId]
     TP_orders = [order for order in open_orders if order.orderType == "LMT" and order.action == action]# and order.parentId]
@@ -206,7 +207,7 @@ def create_bracket_orders(ib, contract, data, quantity, TP, SL, trail=None, part
             # bracket_params[0]["quantity"] = round(abs(float(values["-quantity-"])) * partial_perc / 100)
 
             adjust_bracket_orders(ib, contract)
-            ib.sleep(constants.CONSTANTS.PROCESS_TIME['medium'])
+            ib.sleep(CONSTANTS.PROCESS_TIME['medium'])
 
             # Get last take profit and stop loss
             TP_orders, SL_orders = get_bracket_orders(ib, contract, action)
@@ -228,7 +229,7 @@ def create_bracket_orders(ib, contract, data, quantity, TP, SL, trail=None, part
             cancel_order_by_id(ib, last_SL_order.orderId)
             cancel_order_by_id(ib, last_TP_order.orderId)
             placeTPSLOrders(ib, contract, action, partial_quantity, last_TP_order.lmtPrice, last_SL_order.auxPrice, trail=trail)
-            ib.sleep(constants.CONSTANTS.PROCESS_TIME['medium'])
+            ib.sleep(CONSTANTS.PROCESS_TIME['medium'])
 
             # print("\n\ndata = ", data)
             # print("action = ", action)
@@ -268,14 +269,14 @@ def create_bracket_orders(ib, contract, data, quantity, TP, SL, trail=None, part
 
 
 # def trim_bracket_orders(ib, contract, adjust_SL=True, adjust_TP=True):
-def adjust_bracket_orders(ib, symbol, currency='USD'):#, new_qty):#, adjust_SL=True, adjust_TP=True):
+def adjust_bracket_orders(ib, symbol, currency=CONSTANTS.DEFAULT_CURRENCY):#, new_qty):#, adjust_SL=True, adjust_TP=True):
 
     contract, mktData = helpers.get_symbol_mkt_data(ib, symbol, currency=currency)
 
     delta_TP, delta_SL = 0, 0
     last_TP_order, last_SL_order = None, None
 
-    ib.sleep(constants.CONSTANTS.PROCESS_TIME['short'])
+    ib.sleep(CONSTANTS.PROCESS_TIME['short'])
     open_position = get_positions_by_symbol(ib, contract.symbol)
 
     if open_position:
@@ -286,7 +287,7 @@ def adjust_bracket_orders(ib, symbol, currency='USD'):#, new_qty):#, adjust_SL=T
         # Check exisiting stop losses and take profits
         # open_orders = get_orders_by_status(ib, status=["PreSubmitted", "Submitted"], symbol=contract.symbol)
         # open_orders = get_active_orders(ib, symbol=contract.symbol)
-        # ib.sleep(constants.CONSTANTS.PROCESS_TIME['short'])
+        # ib.sleep(CONSTANTS.PROCESS_TIME['short'])
 
         action = "BUY" if open_position.position < 0 else "SELL"
         action_inverse = "BUY" if open_position.position >= 0 else "SELL"
@@ -409,7 +410,7 @@ def adjust_bracket_orders(ib, symbol, currency='USD'):#, new_qty):#, adjust_SL=T
     else:
         print("No open position for symbol ", contract.symbol, ". Closing all pending orders...")
         cancel_orders_by_symbol(ib, contract.symbol)
-        ib.sleep(constants.CONSTANTS.PROCESS_TIME['short'])
+        ib.sleep(CONSTANTS.PROCESS_TIME['short'])
 
     # return delta_TP, delta_SL, last_TP_order, last_SL_order
 
@@ -421,7 +422,7 @@ def adjust_bracket_orders2(ib, contract):#, new_qty):#, adjust_SL=True, adjust_T
     delta_TP, delta_SL = 0, 0
     last_TP_order, last_SL_order = None, None
 
-    ib.sleep(constants.CONSTANTS.PROCESS_TIME['short'])
+    ib.sleep(CONSTANTS.PROCESS_TIME['short'])
     open_position = get_positions_by_symbol(ib, contract.symbol)
 
     if open_position:
@@ -432,7 +433,7 @@ def adjust_bracket_orders2(ib, contract):#, new_qty):#, adjust_SL=True, adjust_T
         # Check exisiting stop losses and take profits
         # open_orders = get_orders_by_status(ib, status=["PreSubmitted", "Submitted"], symbol=contract.symbol)
         # open_orders = get_active_orders(ib, symbol=contract.symbol)
-        # ib.sleep(constants.CONSTANTS.PROCESS_TIME['short'])
+        # ib.sleep(CONSTANTS.PROCESS_TIME['short'])
 
         action = "BUY" if open_position.position < 0 else "SELL"
         action_inverse = "BUY" if open_position.position >= 0 else "SELL"
@@ -460,7 +461,7 @@ def adjust_bracket_orders2(ib, contract):#, new_qty):#, adjust_SL=True, adjust_T
     else:
         print("No open position for symbol ", contract.symbol, ". Closing all pending orders...")
         cancel_orders_by_symbol(ib, contract.symbol)
-        ib.sleep(constants.CONSTANTS.PROCESS_TIME['short'])
+        ib.sleep(CONSTANTS.PROCESS_TIME['short'])
 
 
 def record_bracket(ib, contract, action=None):
@@ -501,7 +502,7 @@ def recreate_bracket(ib, contract, bo_list, action='auto', qty_factor=1, TP=None
             placeTPSLOrders(ib, contract, action, qty=quantity, TP=take_profit, SL=stop_loss, trail=trail)
 
 
-def move_SL_to_BE(ib, symbol, offset, trail=None, currency='USD'):
+def move_SL_to_BE(ib, symbol, offset, trail=None, currency=CONSTANTS.DEFAULT_CURRENCY):
 
     contract, mktData = helpers.get_symbol_mkt_data(ib, symbol, currency=currency)
     open_position = get_positions_by_symbol(ib, symbol)
@@ -525,7 +526,7 @@ def move_SL_to_BE(ib, symbol, offset, trail=None, currency='USD'):
                     if bo['SL']: bo['SL'] = avgPosition
 
                 cancel_orders_by_symbol(ib, symbol)
-                ib.sleep(constants.CONSTANTS.PROCESS_TIME['short'])
+                ib.sleep(CONSTANTS.PROCESS_TIME['short'])
 
                 if not SL_orders:
                     placeTPSLOrders(ib, contract, action, qty=abs(open_position.position), TP='', SL=avgPosition, trail=trail)
@@ -546,7 +547,7 @@ def move_SL_to_BE(ib, symbol, offset, trail=None, currency='USD'):
     else:
         print("Could not fetch market data or no open position")
 
-# Position(account='U14264367', contract=Stock(conId=324651164, symbol='QUBT', exchange='NASDAQ', currency='USD', localSymbol='QUBT', tradingClass='SCM'), position=5.0, avgCost=18.31632345)
+# Position(account='U14264367', contract=Stock(conId=324651164, symbol='QUBT', exchange='NASDAQ', currency=CONSTANTS.DEFAULT_CURRENCY, localSymbol='QUBT', tradingClass='SCM'), position=5.0, avgCost=18.31632345)
 
 
 def get_orders_by_status(ib, status, symbol=None):
@@ -611,20 +612,20 @@ def cancel_orders_by_symbol(ib, symbol, status=None):
 def cancel_order_by_id(ib, orderId):
     if orderId == "all":
         ib.reqGlobalCancel()
-        ib.sleep(constants.CONSTANTS.PROCESS_TIME['short'])
+        ib.sleep(CONSTANTS.PROCESS_TIME['short'])
     else:
         order = get_order_by_id(ib, orderId)
 
         if order:
             print("\nCancelling order ", orderId)
             ib.cancelOrder(order[-1])
-            ib.sleep(constants.CONSTANTS.PROCESS_TIME['short'])
+            ib.sleep(CONSTANTS.PROCESS_TIME['short'])
 
 
 def get_positions_by_symbol(ib, symbol):
 
     # positions = ib.positions()
-    # ib.sleep(constants.CONSTANTS.PROCESS_TIME['short'])
+    # ib.sleep(CONSTANTS.PROCESS_TIME['short'])
 
     # sym = trade.contract.localSymbol if trade.contract.localSymbol else ''
     # if "." in sym: # Case Forex symbol
