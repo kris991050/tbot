@@ -9,11 +9,12 @@ from utils.constants import CONSTANTS
 
 class TradingConfig:
     def __init__(self, live_mode:str='live'):
-        self.initial_capital: float = 100000
-        self.position_size_pct: float = 0.02    # risk per trade (2%)
+        self.capital: float = 10000
+        self.risk_pct: float = 0.01    # risk per trade (1%)
         self.sl_pct: float = 0.05               # stop loss: 1%
         self.tp_pct: float = 0.1                # take profit: 2%
         self.max_hold_minuties: int = 120       # max holding period
+        self.seed = None
 
         # Predictions config
         self.use_model_prediction: bool = True  # use prediction for entry filter or position sizing
@@ -22,16 +23,16 @@ class TradingConfig:
         # Risk and stop config
         self.rrr_threshold: float = 0.5
         self.tier_max: int = 5
-        self.size = 'auto'
+        self.size = 'exponential'
         self.offset_targets: int = 10
         self.profit_ratio: int = 2
         self.perc_gain: int = 10
-        self.max_time_factor: int = 50
+        self.max_time_factor: int = 12
         self.max_loss_perc: int = 1
         self.partial_perc: int = 10
-        self.default_currency: str = CONSTANTS.DEFAULT_CURRENCY
+        self.currency: str = CONSTANTS.DEFAULT_CURRENCY
         self.pred_vlty_type: str = 'garch' # 'ewma'
-        self.volatility_factor: int = 2
+        self.volatility_factor: int = 1
 
         # ML model config
         self.model_type: str = 'xgboost'
@@ -48,7 +49,6 @@ class TradingConfig:
         # Features thresholds
         self.rsi_threshold: int = 75
         self.cam_M_threshold: int = 3
-        target_factor: float = 10
 
         # Data handling config
         # self.look_backward = '1M'
@@ -79,6 +79,7 @@ class TradingConfig:
             config_dict['sim_max_time'] = str(self.sim_max_time)  # Save timedelta as string
 
         helpers.save_json(config_dict, config_path, lock=False)
+        print(f"💾 Saved config at {config_path}")
     
     def load_config(self, config_path):
         """ Load the configuration from the file """

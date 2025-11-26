@@ -25,7 +25,7 @@ import trade_evaluator
 
 class BacktraderStrategyWrapper(bt.Strategy):
     params = dict(
-        manager=None,
+        tmanager=None,
         entry_delay=1,
         total_bars=None,
         df = pd.DataFrame(),
@@ -33,7 +33,7 @@ class BacktraderStrategyWrapper(bt.Strategy):
     )
 
     def __init__(self):
-        self.manager = self.p.manager
+        self.tmanager = self.p.tmanager
         self.active_stop_price = None  # stores fixed stop-loss value for current trade
         self.reset_active_stop_price = False
         self.total_bars = self.p.total_bars
@@ -53,7 +53,7 @@ class BacktraderStrategyWrapper(bt.Strategy):
         self.quantity = None
 
         # Determine which columns the strategy requires
-        self.required_columns = self.manager.get_required_columns()
+        self.required_columns = self.tmanager.get_required_columns()
 
         # Initialize trade log
         self.trades = []
@@ -72,7 +72,7 @@ class BacktraderStrategyWrapper(bt.Strategy):
 
         # Special fields
         row['model_prediction'] = getattr(self.datas[0], 'model_prediction', [None])[-ago]
-        row['predicted_drawdown'] = getattr(self.datas[0], 'predicted_drawdown', [None])[-ago] if self.manager.trainer_dd is not None else None
+        row['predicted_drawdown'] = getattr(self.datas[0], 'predicted_drawdown', [None])[-ago] if self.tmanager.trainer_dd is not None else None
         row['date'] = pd.Timestamp(self.datas[0].datetime.datetime(-ago), tz=constants.CONSTANTS.TZ_WORK)
         row['close'] = self.datas[0].close[-ago] if self.datas[0].close else None
     
@@ -102,7 +102,7 @@ class BacktraderStrategyWrapper(bt.Strategy):
             return
         
         # symbol = self.datas[0]._name
-        trade_evaluator.TradeEvaluator.log_trade(self.manager.direction, self.trades, self.entry_idx, self.exit_idx, self.df, 
+        trade_evaluator.TradeEvaluator.log_trade(self.tmanager.direction, self.trades, self.entry_idx, self.exit_idx, self.df, 
                                                  self.entry_price, self.exit_price, self.quantity, self.decision_prediction, 
                                                  self.entry_prediction, self.active_stop_price, self.exit_reason, self.symbol, 
                                                  self.entry_exec_price, self.exit_exec_price, self.entry_commission, self.exit_commission)
@@ -116,12 +116,12 @@ class BacktraderStrategyWrapper(bt.Strategy):
             is_exit = self.in_position
 
             if order.isbuy():
-                if self.manager.direction == 1 and is_entry:
+                if self.tmanager.direction == 1 and is_entry:
                     self.entry_exec_price = order.executed.price
                     self.entry_commission = order.executed.comm
                     self.in_position = True
                     print(f"\n[LONG ENTRY] BUY executed @ {self.entry_exec_price:.2f}")
-                elif self.manager.direction == -1 and is_exit:
+                elif self.tmanager.direction == -1 and is_exit:
                     self.exit_exec_price = order.executed.price
                     self.exit_commission = order.executed.comm
                     self.in_position = False
@@ -129,12 +129,12 @@ class BacktraderStrategyWrapper(bt.Strategy):
                     self._log_trade_if_complete()
 
             elif order.issell():
-                if self.manager.direction == -1 and is_entry:
+                if self.tmanager.direction == -1 and is_entry:
                     self.entry_exec_price = order.executed.price
                     self.entry_commission = order.executed.comm
                     self.in_position = True
                     print(f"\n[SHORT ENTRY] SELL executed @ {self.entry_exec_price:.2f}")
-                elif self.manager.direction == 1 and is_exit:
+                elif self.tmanager.direction == 1 and is_exit:
                     self.exit_exec_price = order.executed.price
                     self.exit_commission = order.executed.comm
                     self.in_position = False
@@ -148,11 +148,11 @@ class BacktraderStrategyWrapper(bt.Strategy):
 
     def execute_order(self, action):
         if action == 'entry':
-            if self.manager.direction == 1:
+            if self.tmanager.direction == 1:
                 self.order = self.buy()
-            elif self.manager.direction == -1:
+            elif self.tmanager.direction == -1:
                 self.order = self.sell()
-            else: raise ValueError(f"Invalid direction: {self.manager.direction}")
+            else: raise ValueError(f"Invalid direction: {self.tmanager.direction}")
             
         elif action == 'exit':
             if self.position.size > 0:
@@ -169,7 +169,7 @@ class BacktraderStrategyWrapper(bt.Strategy):
         self.display_status_progress()
 
         curr_idx = len(self) - 1
-        decision_idx = curr_idx - self.manager.entry_delay
+        decision_idx = curr_idx - self.tmanager.entry_delay
         prev_decision_idx = decision_idx - 1
 
         if decision_idx < 0:
@@ -183,8 +183,8 @@ class BacktraderStrategyWrapper(bt.Strategy):
         # curr_row = self.build_row(curr_idx)
         # prev_decision_row = self.build_row(decision_idx - 1) if decision_idx - 1 >= 0 else decision_row
         curr_row = self.build_row(0)
-        decision_row = self.build_row(self.manager.entry_delay)
-        prev_decision_row = self.build_row(self.manager.entry_delay + 1)
+        decision_row = self.build_row(self.tmanager.entry_delay)
+        prev_decision_row = self.build_row(self.tmanager.entry_delay + 1)
 
         # time_test = pd.Timestamp('2024-11-06 11:43:00-0500', tz='US/Eastern')
         # if curr_row['date'] == time_test:
@@ -192,32 +192,32 @@ class BacktraderStrategyWrapper(bt.Strategy):
         
         # Entry logic
         if not self.in_position:#self.position:
-            if self.manager.evaluate_entry_conditions(decision_row, self.active_stop_price, display_triggers=False):
+            if self.tmanager.evaluate_entry_conditions(decision_row, self.active_stop_price, display_triggers=False):
                 self.entry_price = curr_row['close']
                 self.entry_idx = curr_idx
                 self.entry_time = curr_row['date']
                 self.decision_prediction = decision_row['model_prediction']
                 self.entry_prediction = curr_row['model_prediction']
-                self.quantity = self.manager.evaluate_quantity(self.entry_prediction)
+                self.quantity = self.tmanager.evaluate_quantity(self.entry_prediction, self.entry_price, self.broker.get_cash(), self.tmanager.config.risk_pct)
                 self.order = self.execute_order('entry')
-                decision_row = self.manager.add_pred_vlty(curr_row, self.symbol)
+                decision_row = self.tmanager.add_pred_vlty(curr_row, self.symbol)
 
                 # Resolve stop once here
-                self.active_stop_price = self.manager.resolve_stop_price(decision_row, self.active_stop_price)
+                self.active_stop_price = self.tmanager.resolve_stop_price(decision_row, self.active_stop_price)
 
                 # Set target entry time and price
-                # if hasattr(self.manager.strategy_instance.target_handler, 'set_entry_time'):
-                #     self.manager.strategy_instance.target_handler.set_entry_time(curr_row['date'])
-                # if hasattr(self.manager.strategy_instance.target_handler, 'set_target_price'):
-                #     self.manager.strategy_instance.target_handler.set_target_price(row=decision_row, stop_price=self.active_stop_price)
-                self.manager.set_target_for_entry(row=decision_row, stop_price=self.active_stop_price, symbol=self.symbol)
+                # if hasattr(self.tmanager.strategy_instance.target_handler, 'set_entry_time'):
+                #     self.tmanager.strategy_instance.target_handler.set_entry_time(curr_row['date'])
+                # if hasattr(self.tmanager.strategy_instance.target_handler, 'set_target_price'):
+                #     self.tmanager.strategy_instance.target_handler.set_target_price(row=decision_row, stop_price=self.active_stop_price)
+                self.tmanager.set_target_for_entry(row=decision_row, stop_price=self.active_stop_price, symbol=self.symbol)
 
-                reason2close = self.manager.assess_reason2close(decision_row, prev_decision_row, self.active_stop_price)
+                reason2close = self.tmanager.assess_reason2close(decision_row, prev_decision_row, self.active_stop_price)
                 if reason2close:
                     self.reset_active_stop_price = True # Don't reset active_stop_price directly or log_trade won't get the qctive_stop_price value
         else:
             # Exit logic
-            reason2close = self.manager.assess_reason2close(decision_row, prev_decision_row, self.active_stop_price)
+            reason2close = self.tmanager.assess_reason2close(decision_row, prev_decision_row, self.active_stop_price)
             if reason2close:
                 self.exit_idx = curr_idx
                 self.exit_price = curr_row['close']

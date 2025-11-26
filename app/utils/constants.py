@@ -67,12 +67,14 @@ class CONSTANTS():
         FORBIDDEN_TIMEFRAMES_POLYGON = []#['1M']
         FORBIDDEN_SYMBOLS_POLYGON = ['QIPT', 'LIN']
 
+        # Constrained parameters
         MODES = {'live': ['live', 'sim'], 'backtest': ['backtest', 'forward']}
         LIVE_ACTIONS = ['fetch', 'enrich', 'execut']
         FETCHER_TYPES = ['ibkr', 'polygon']
-        pred_vlty_TYPES = ['garch', 'ewma']
+        PRED_VLTY_TYPES = ['garch', 'ewma']
         DEFAULT_TIMEFRAME = {'multiplier': 1, 'unit': 'minute'}
         DIRECTIONS = ['bull', 'bear']
+        POSITION_SIZING_MODE = ['linear', 'exponential', 'logarithmic', 'sigmoid']
 
         LEVELS_ROUNDING_PRECISION = 2
 

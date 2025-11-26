@@ -17,10 +17,11 @@ class BacktestOrchestrator:
     def __init__(self, ib:IB, strategy_name:str, stop=None, revised:bool=False, symbols:list=None, seed:int=None, timeframe=Timeframe(), 
                  config=None, engine_type:str='custom', selector_type:str='rf', mode:str='backtest', timezone=None, 
                  look_bacward:str=None, step_duration:str=None):
-        self.manager = trade_manager.TradeManager(ib, config, strategy_name, stop, revised=revised, look_backward=look_bacward, step_duration=step_duration, 
+        self.tmanager = trade_manager.TradeManager(ib, config, strategy_name, stop, revised=revised, look_backward=look_bacward, step_duration=step_duration, 
                                                   selector_type=selector_type, timezone=timezone)
-        self.strategy_required_columns = self.manager.get_strategy_required_columns()
-        # self.required_columns = self.manager.get_required_columns()
+        self.strategy_required_columns = self.tmanager.get_strategy_required_columns()
+        self.look_backward = look_bacward or CONSTANTS.WARMUP_MAP[self.tmanager.strategy_instance.timeframe.pandas]
+        # self.required_columns = self.tmanager.get_required_columns()
         self.seed = seed
         self.engine_type = engine_type
         self.mode = helpers.set_var_with_constraints(mode, CONSTANTS.MODES['backtest'])
@@ -29,9 +30,9 @@ class BacktestOrchestrator:
         self.all_trades = []
 
     def setup_paths(self):
-        self.file_name_pattern = f"{self.engine_type}_{self.manager.strategy_name}_{self.manager.config.model_type}_{self.manager.config.selector_type}_{self.mode}_{self.manager.strategy_instance.timeframe}_seed{self.seed}_{self.manager.strategy_instance.target_handler.target_str}_{self.manager.config.stop}_pred{str(self.manager.config.pred_th)}_delay{self.manager.entry_delay}"
+        self.file_name_pattern = f"{self.engine_type}_{self.tmanager.strategy_name}_{self.tmanager.config.model_type}_{self.tmanager.config.selector_type}_{self.mode}_{self.tmanager.strategy_instance.timeframe}_seed{self.seed}_{self.tmanager.strategy_instance.target_handler.target_str}_{self.tmanager.config.stop}_qty{self.tmanager.config.size[:3]}_pred{str(self.tmanager.config.pred_th)}_delay{self.tmanager.entry_delay}"
         base_folder = PATHS.folders_path['strategies_data']
-        self.outputs_folder = os.path.join(base_folder, self.manager.strategy_name, f'backtest_{self.file_name_pattern}')
+        self.outputs_folder = os.path.join(base_folder, self.tmanager.strategy_name, f'backtest_{self.file_name_pattern}')
         # self.data_folder = os.path.join(base_folder, 'backtest_data')
         # os.makedirs(self.data_folder, exist_ok=True)
         self.checkpoint_file_path = os.path.join(self.outputs_folder, 'test_checkpoint.json')
@@ -61,7 +62,7 @@ class BacktestOrchestrator:
             return symbols
         if self.seed:
             return helpers.get_symbol_seed_list(self.seed)
-        df = pd.read_csv(self.manager.trainer.paths['data'])
+        df = pd.read_csv(self.tmanager.trainer.paths['data'])
         if df.empty:
             print("Results Dataframe is empty")
             return []
@@ -69,18 +70,18 @@ class BacktestOrchestrator:
             return sorted(df['symbol'].unique())
 
     def load_data_backtest(self, symbol, data_set='test', file_format='parquet'):
-        # path = os.path.join(self.data_folder, f"df_test_{symbol}_{self.manager.timeframe}.{file_format}")
+        # path = os.path.join(self.data_folder, f"df_test_{symbol}_{self.tmanager.timeframe}.{file_format}")
 
         # if os.path.exists(path):
         #     return helpers.load_df_from_file(path)
 
-        test_to = pd.to_datetime(self.manager.trainer.data_ranges[data_set][1], utc=True).tz_convert(CONSTANTS.TZ_WORK)
-        test_from = pd.to_datetime(self.manager.trainer.data_ranges[data_set][0], utc=True).tz_convert(CONSTANTS.TZ_WORK)
+        test_to = pd.to_datetime(self.tmanager.trainer.data_ranges[data_set][1], utc=True).tz_convert(CONSTANTS.TZ_WORK)
+        test_from = pd.to_datetime(self.tmanager.trainer.data_ranges[data_set][0], utc=True).tz_convert(CONSTANTS.TZ_WORK)
 
         # test_to = pd.Timestamp('2025-10-01 20:00:00', tz=CONSTANTS.TZ_WORK)
         # test_from = pd.Timestamp('2025-08-01 04:00:00', tz=CONSTANTS.TZ_WORK)
 
-        df = self.manager.enrich_df(symbol, file_format=file_format, select_features=False)
+        df = self.tmanager.enrich_df(symbol, file_format=file_format, select_features=False)
         
         # Trim again to ensure it is trimmed
         df = helpers.trim_df(df, from_time=test_from, to_time=test_to)
@@ -92,17 +93,17 @@ class BacktestOrchestrator:
 
     def select_engine(self, df, symbol):
         if self.engine_type == 'custom':
-            return custom_backtester.CustomBacktestEngine(df, symbol, self.manager)
+            return custom_backtester.CustomBacktestEngine(df, symbol, self.tmanager)
         elif self.engine_type == 'backtrader':
-            return backtrader_backtester.BacktraderBacktestEngine(df=df, symbol=symbol, manager=self.manager)
+            return backtrader_backtester.BacktraderBacktestEngine(df=df, symbol=symbol, manager=self.tmanager)
         else:
             raise ValueError(f"Unknown engine type: {self.engine_type}")
 
     def _run_backtest_engine(self, df, symbol):
         
         # df, _ = features_processor.apply_feature_transformations(df, drop=False)
-        # df = self.manager.trainer.preprocessor.prepare_features(df, self.manager.model, display_features=False, drop=False)
-        df = self.manager.apply_model_predictions(df, symbol)
+        # df = self.tmanager.trainer.preprocessor.prepare_features(df, self.tmanager.model, display_features=False, drop=False)
+        df = self.tmanager.apply_model_predictions(df, symbol)
 
         # Trimming df to only required columns
         # df = df[self.required_columns]
@@ -145,7 +146,7 @@ class BacktestOrchestrator:
             # dates_list = helpers.get_dates_list(datetime.date(2025, 5, 29), datetime.date(2025, 6, 1))#days_ago=12)
             
             for date_assess in dates_list:
-                df_csv_file = self.manager.get_symbols_from_daily_data_folder(date_assess)
+                df_csv_file = self.tmanager.get_symbols_from_daily_data_folder(date_assess)
                 if df_csv_file.empty:
                     print(f"❌ No data found for {date_assess}")
                     continue
@@ -166,7 +167,8 @@ class BacktestOrchestrator:
                     th_times = CONSTANTS.TH_TIMES['end_of_day']
                     to_time = trig_time.normalize() + pd.Timedelta(hours=th_times.hour, minutes=th_times.minute, seconds=th_times.second) if trig_time else None
                     
-                    df = self.manager.load_data_live(symbol, trig_time, to_time, file_format='parquet') if (trig_time and to_time) else pd.DataFrame()
+                    df = self.tmanager.load_data_forward(symbol, trig_time, to_time, file_format='parquet', look_backward=self.look_backward) \
+                        if (trig_time and to_time) else pd.DataFrame()
                     
                     if not df.empty:
                         try:

@@ -75,7 +75,7 @@ class CustomBacktestEngine:
     def __init__(self, df, symbol, manager):#, mode='live'):
         self.df = df.reset_index(drop=True)#.copy()
         self.symbol = symbol
-        self.manager = manager
+        self.tmanager = manager
         self.active_stop_price = None  # stores fixed stop-loss value for current trade
         self.trades = []
         self.df_tr = self._build_df_tr()
@@ -84,9 +84,10 @@ class CustomBacktestEngine:
         self.entry_commission = 0.0
         self.exit_commission = 0.0
         self.slippage_pct = 0.001
+        self.capital = self.tmanager.config.capital
     
     def _build_df_tr(self):
-        if self.manager.strategy_instance.revised:
+        if self.tmanager.strategy_instance.revised:
             df_tr, _ = features_processor.apply_feature_transformations(self.df)
             new_cols = [col for col in df_tr.columns if col not in self.df.columns]
             df_tr = pd.concat([self.df, df_tr[new_cols]], axis=1) # Concatenate only those new columns
@@ -101,12 +102,12 @@ class CustomBacktestEngine:
         entry_idx = None
         entry_price = None
 
-        df = self.df if not self.manager.strategy_instance.revised else self.df_tr
+        df = self.df if not self.tmanager.strategy_instance.revised else self.df_tr
 
-        for i in tqdm.tqdm(range(self.manager.entry_delay, len(df)), desc=f"Backtesting {self.symbol}"):
+        for i in tqdm.tqdm(range(self.tmanager.entry_delay, len(df)), desc=f"Backtesting {self.symbol}"):
 
-            decision_row = df.iloc[i - self.manager.entry_delay]
-            prev_decision_row = df.iloc[i - self.manager.entry_delay - 1] if i - self.manager.entry_delay - 1 >= 0 else decision_row
+            decision_row = df.iloc[i - self.tmanager.entry_delay]
+            prev_decision_row = df.iloc[i - self.tmanager.entry_delay - 1] if i - self.tmanager.entry_delay - 1 >= 0 else decision_row
             # prev_row = df.iloc[i - 1]
             curr_row = df.iloc[i]
 
@@ -115,41 +116,43 @@ class CustomBacktestEngine:
             #     print()
             
             if not in_position:
-                if self.manager.evaluate_entry_conditions(decision_row, self.active_stop_price, display_triggers=False):
+                if self.tmanager.evaluate_entry_conditions(decision_row, self.active_stop_price, display_triggers=False):
                     entry_idx = i
                     entry_price = curr_row['close']
-                    self.entry_exec_price = entry_price * (1 + self.manager.direction * self.slippage_pct)
+                    self.entry_exec_price = entry_price * (1 + self.tmanager.direction * self.slippage_pct)
                     decision_prediction = decision_row['model_prediction']
                     entry_prediction = curr_row['model_prediction']
-                    quantity = self.manager.evaluate_quantity(entry_prediction)
-                    curr_row = self.manager.add_pred_vlty(curr_row, self.symbol)
+                    quantity = self.tmanager.evaluate_quantity(entry_prediction, entry_price, self.tmanager.config.capital, self.tmanager.config.risk_pct)
+                    curr_row = self.tmanager.add_pred_vlty(curr_row, self.symbol)
 
                     # Resolve stop once here
-                    self.active_stop_price = self.manager.resolve_stop_price(curr_row, self.active_stop_price)
+                    self.active_stop_price = self.tmanager.resolve_stop_price(curr_row, self.active_stop_price)
 
                     # Set target entry time and price
-                    # if hasattr(self.manager.strategy_instance.target_handler, 'set_entry_time'):
-                    #     self.manager.strategy_instance.target_handler.set_entry_time(curr_row['date'])
-                    # if hasattr(self.manager.strategy_instance.target_handler, 'set_target_price'):
-                    #     self.manager.strategy_instance.target_handler.set_target_price(row=decision_row, stop_price=self.active_stop_price, symbol=self.symbol)
-                    self.manager.set_target_for_entry(row=decision_row, stop_price=self.active_stop_price, symbol=symbol)
+                    # if hasattr(self.tmanager.strategy_instance.target_handler, 'set_entry_time'):
+                    #     self.tmanager.strategy_instance.target_handler.set_entry_time(curr_row['date'])
+                    # if hasattr(self.tmanager.strategy_instance.target_handler, 'set_target_price'):
+                    #     self.tmanager.strategy_instance.target_handler.set_target_price(row=decision_row, stop_price=self.active_stop_price, symbol=self.symbol)
+                    self.tmanager.set_target_for_entry(row=decision_row, stop_price=self.active_stop_price, symbol=self.symbol)
 
-                    reason2close = self.manager.assess_reason2close(decision_row, prev_decision_row, self.active_stop_price)
+                    reason2close = self.tmanager.assess_reason2close(decision_row, prev_decision_row, self.active_stop_price)
                     if not reason2close:
                         in_position = True
+                        self.capital -= self.entry_exec_price * quantity
                     else:
                         self.active_stop_price = None
             else:
-                reason2close = self.manager.assess_reason2close(decision_row, prev_decision_row, self.active_stop_price)
+                reason2close = self.tmanager.assess_reason2close(decision_row, prev_decision_row, self.active_stop_price)
                 if reason2close:
                     exit_idx = i
                     exit_price = curr_row['close']
-                    self.exit_exec_price = exit_price * (1 - self.manager.direction * self.slippage_pct)
-                    trade_evaluator.TradeEvaluator.log_trade(self.manager.direction, self.trades, entry_idx, exit_idx, self.df, entry_price, exit_price, quantity, 
+                    self.exit_exec_price = exit_price * (1 - self.tmanager.direction * self.slippage_pct)
+                    trade_evaluator.TradeEvaluator.log_trade(self.tmanager.direction, self.trades, entry_idx, exit_idx, self.df, entry_price, exit_price, quantity, 
                                              decision_prediction, entry_prediction, self.active_stop_price, reason2close, self.symbol, 
                                              self.entry_exec_price, self.exit_exec_price, self.entry_commission, self.exit_commission)
                     in_position = False
                     self.active_stop_price = None  # Reset for next trade
+                    self.capital += self.exit_exec_price * quantity
 
         if self.trades:
             print(helpers.df_to_table(pd.DataFrame(self.trades).round(2).astype(str)))

@@ -9,18 +9,18 @@ from execution import trade_manager
 
 
 class BacktraderBacktestEngine:
-    def __init__(self, df, symbol, manager):
+    def __init__(self, df:pd.DataFrame, symbol:str, tmanager:trade_manager.TradeManager):
         self.df = df
         self.symbol = symbol
-        self.manager = manager
+        self.tmanager = tmanager
         self.trades = []
         self.all_required_columns = self._build_all_required_columns()
         self.dropped_required_columns = []
 
     def _build_all_required_columns(self):
-        required_columns = self.manager.get_strategy_required_columns()
+        required_columns = self.tmanager.get_strategy_required_columns()
         bt_required_columns = ['open', 'high', 'low', 'close', 'volume', 'model_prediction']
-        if self.manager.trainer_dd is not None: bt_required_columns.append('predicted_drawdown')
+        if self.tmanager.trainer_dd is not None: bt_required_columns.append('predicted_drawdown')
 
         all_required_columns = list(set(required_columns + bt_required_columns))
 
@@ -75,12 +75,12 @@ class BacktraderBacktestEngine:
 
         cerebro.addstrategy(
             backtrader_wrapper.BacktraderStrategyWrapper,
-            manager=self.manager,
+            tmanager=self.tmanager,
             total_bars=len(self.df),
             df=self.df,
             dropped_required_columns = self.dropped_required_columns
         )
-        cerebro.broker.setcash(10000)
+        cerebro.broker.setcash(self.tmanager.config.capital)
         cerebro.broker.addcommissioninfo(ib_comm)
         cerebro.broker.set_slippage_perc(perc=0.001) # 0.1%
         t_now = datetime.datetime.now()

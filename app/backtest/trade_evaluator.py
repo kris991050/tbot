@@ -124,7 +124,7 @@ class TradeEvaluator:
         rrr = expected_reward / predicted_drawdown if predicted_drawdown else np.nan
 
         pnl = direction * (exit_exec_price - entry_exec_price) * quantity
-        return_pct = pnl / (entry_exec_price * quantity) * 100 if entry_exec_price else np.nan
+        return_pct = pnl / (entry_exec_price * quantity) * 100 if (entry_exec_price and quantity and quantity > 0) else np.nan
         total_commission = entry_commission + exit_commission
         net_pnl = pnl - total_commission
         slippage_entry = entry_exec_price - entry_price if entry_exec_price else None

@@ -9,7 +9,7 @@ import trading_config
 
 
 class LiveDataLogger:
-    def __init__(self, worker_type:str='', config=None, live_mode=None, sim_offset=None, timezone=None):
+    def __init__(self, worker_type:str=None, config=None, live_mode=None, sim_offset=None, timezone=None):
         self.worker_type = worker_type
         self.config = config or trading_config.TradingConfig().set_config(locals())
         # self.mode = mode
@@ -36,10 +36,10 @@ class LiveDataLogger:
             'enrich': os.path.join(date_folder, enrich_queue_file_name), 
             'execut': os.path.join(date_folder, execute_queue_file_name)
         }
-        live_log_file_name = f"live_log_{self.worker_type}_{date_now.strftime("%Y-%m-%d_%H-%M-%S")}{sim_str}.txt"
-        self.live_log_file_path = os.path.join(logs_folder, live_log_file_name)
         trade_log_file_name = f"trade_log_{date_now.strftime("%Y-%m-%d")}{sim_str}.csv"
         self.trade_log_file_path = os.path.join(logs_folder, trade_log_file_name)
+        live_log_file_name = f"live_log_{self.worker_type}_{date_now.strftime("%Y-%m-%d_%H-%M-%S")}{sim_str}.txt" if self.worker_type else None
+        self.live_log_file_path = os.path.join(logs_folder, live_log_file_name) if live_log_file_name else None
         self.default_priority = 2
 
     def initialize_ticker(self):

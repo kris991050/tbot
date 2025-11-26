@@ -13,18 +13,18 @@ from execution import trade_executor, orders
 
 
 class LiveWorker(live_loop_base.LiveLoopBase):
-    def __init__(self, action:str, wait_seconds:int=None, continuous:bool=True, single_symbol=None, ib_disconnect:bool=False, initialize:bool=True, 
-                 tickers_list:dict={}, base_folder:str=None, config=None, strategy_name:str=None, stop:str=None, revised:bool=None, look_backward:str=None, 
-                 step_duration:str=None, live_mode:str=None, file_format: str=None, paper_trading:bool=None, remote_ib:bool=None, timezone=None):
+    def __init__(self, action:str, wait_seconds:int=None, continuous:bool=True, single_symbol=None, initialize:bool=True, 
+                 tickers_list:dict={}, base_folder:str=None, config=None, look_backward:str=None, live_mode:str=None, paper_trading:bool=None, 
+                 remote_ib:bool=None, timezone=None):
             
-            super().__init__(worker_type=f"{action}er", wait_seconds=wait_seconds, continuous=continuous, single_symbol=single_symbol, ib_disconnect=ib_disconnect, 
+            super().__init__(worker_type=f"{action}er", wait_seconds=wait_seconds, continuous=continuous, single_symbol=single_symbol, ib_disconnect=False, 
                              live_mode=live_mode, config=config, paper_trading=paper_trading, remote_ib=remote_ib, timezone=timezone)
             
             self.action = helpers.set_var_with_constraints(action, CONSTANTS.LIVE_ACTIONS)
             self.base_folder = base_folder or PATHS.folders_path['live_data']
-            self.manager.base_folder = self.base_folder
+            self.tmanager.base_folder = self.base_folder
             self.executor = trade_executor.TradeExecutor(self.ib, config=self.config)
-            self.look_backward = look_backward or CONSTANTS.WARMUP_MAP[self.manager.strategy_instance.timeframe.pandas]
+            self.look_backward = look_backward or CONSTANTS.WARMUP_MAP[self.tmanager.strategy_instance.timeframe.pandas]
             self.initialize = initialize
             # self.queue = queue or multiprocessing.Queue()
             self.tickers_list = tickers_list or self.logger.load_tickers_list(lock=True)
@@ -32,9 +32,9 @@ class LiveWorker(live_loop_base.LiveLoopBase):
 
     def _fetch_symbol(self, symbol, from_time, to_time, init):
         if init:
-            df = self.manager.fetch_df(symbol=symbol, from_time=from_time, to_time=to_time, file_format=self.config.file_format)
+            df = self.tmanager.fetch_df(symbol=symbol, from_time=from_time, to_time=to_time, file_format=self.config.file_format)
         else:
-            df = self.manager.complete_df(symbol=symbol, file_format=self.config.file_format)
+            df = self.tmanager.complete_df(symbol=symbol, file_format=self.config.file_format)
         return df
     
     def _assess_block_add_sr(self, symbol:str, trig_time:datetime) -> bool:
@@ -52,13 +52,13 @@ class LiveWorker(live_loop_base.LiveLoopBase):
 
     def _enrich_symbol(self, symbol, from_time, to_time, init):
         block_add_sr = False if init else self._assess_block_add_sr(symbol, to_time)            
-        df = self.manager.enrich_df(symbol, self.config.file_format, block_add_sr=block_add_sr, base_timeframe=self.manager.strategy_instance.timeframe, 
+        df = self.tmanager.enrich_df(symbol, self.config.file_format, block_add_sr=block_add_sr, base_timeframe=self.tmanager.strategy_instance.timeframe, 
                                     from_time=from_time, to_time=to_time)
         return df
     
     def _load_symbol_data(self, symbol):
         # try:
-        loader = hist_market_data_handler.HistMarketDataLoader(self.ib, symbol, self.manager.strategy_instance.timeframe, data_type='enriched_data', 
+        loader = hist_market_data_handler.HistMarketDataLoader(self.ib, symbol, self.tmanager.strategy_instance.timeframe, data_type='enriched_data', 
                                                                    base_folder=self.base_folder)
         return loader.load_and_trim()[0]
         # except Exception as e:
@@ -70,10 +70,10 @@ class LiveWorker(live_loop_base.LiveLoopBase):
         if df.empty:
             print(f"⚠️ No data could be loaded for {symbol}")
             return False, pd.Series()
-        df = self.manager.apply_model_predictions(df, symbol)
+        df = self.tmanager.apply_model_predictions(df, symbol)
         last_row = df.iloc[-1]
-        stop_price = self.manager.resolve_stop_price(last_row)
-        is_triggered, is_predicted, is_RRR = self.manager.evaluate_entry_conditions(last_row, stop_price=stop_price, expand=True)
+        stop_price = self.tmanager.resolve_stop_price(last_row)
+        is_triggered, is_predicted, is_RRR = self.tmanager.evaluate_entry_conditions(last_row, stop_price=stop_price, expand=True)
 
         if is_triggered:
             self.tickers_list = self.logger.update_ticker(symbol, 'priority', 3, lock=True, log=True)
@@ -90,7 +90,7 @@ class LiveWorker(live_loop_base.LiveLoopBase):
         df = df if not df.empty else self._load_symbol_data(symbol)
         if not df.empty:
             last_row = df.iloc[-1]
-            discard_condition = self.manager.evaluate_discard_conditions(last_row)
+            discard_condition = self.tmanager.evaluate_discard_conditions(last_row)
             # if discard_condition:
             #     print(f"Discard conditions met for {symbol}")
             #     print(f"rsi_15: {last_row['rsi_15']}\nrsi_60: {last_row['rsi_60']}")
@@ -104,24 +104,24 @@ class LiveWorker(live_loop_base.LiveLoopBase):
         entry_condition, last_row = self._evaluate_entry(symbol)
         if entry_condition:
             print(f"Executing Order for {symbol}")
-            stop_price = self.manager.resolve_stop_price(last_row)
-            # target_price = last_row[self.manager.strategy_instance.params['target_indicator']] if self.manager.strategy_instance.params['target_indicator'] else ''
+            stop_price = self.tmanager.resolve_stop_price(last_row)
+            # target_price = last_row[self.tmanager.strategy_instance.params['target_indicator']] if self.tmanager.strategy_instance.params['target_indicator'] else ''
             # Set target entry time and price
-            self.manager.set_target_for_entry(row=last_row, stop_price=stop_price, symbol=symbol)
-            target_price = self.manager.strategy_instance.target_handler.target_price
-            quantity = self.manager.evaluate_quantity(last_row['model_prediction'])
+            self.tmanager.set_target_for_entry(row=last_row, stop_price=stop_price, symbol=symbol)
+            target_price = self.tmanager.strategy_instance.target_handler.target_price
+            quantity = self.tmanager.evaluate_quantity(last_row['model_prediction'])
             # values = self._create_trade_params(symbol, stop_price, target_price, quantity)
 
             open_position = orders.get_positions_by_symbol(self.ib, symbol)
 
             if not open_position:
                 oorder = trade_executor.OOrder(symbol=symbol, stop_loss=stop_price, take_profit=target_price, quantity=quantity, config=self.config)
-                order, TPSL_order = self.executor.execute_order(self.manager.direction, oorder)
+                order, TPSL_order = self.executor.execute_order(self.tmanager.direction, oorder)
                 now = helpers.calculate_now(self.config.sim_offset, self.config.timezone)
                 self.ib.sleep(CONSTANTS.PROCESS_TIME['long'])
                 order_status = order.orderStatus.status if hasattr(order, 'orderStatus') else None
                 order_avg_fill_price = order.orderStatus.avgFillPrice if hasattr(order, 'orderStatus') else None
-                self.logger.save_to_trade_log_csv(self.ib, now, symbol, last_row, quantity, target_price, stop_price, order_status, order_avg_fill_price,  self.manager.get_required_columns())
+                self.logger.save_to_trade_log_csv(self.ib, now, symbol, last_row, quantity, target_price, stop_price, order_status, order_avg_fill_price,  self.tmanager.get_required_columns())
             else:
                 order = None
 
@@ -144,7 +144,7 @@ class LiveWorker(live_loop_base.LiveLoopBase):
         else:
             return pd.DataFrame()
 
-    def _run(self):
+    def _run_worker(self):
         df = pd.DataFrame()
 
         queue = self.logger.get_queue(self.action, lock=True)
@@ -204,7 +204,7 @@ class LiveWorker(live_loop_base.LiveLoopBase):
         return df
     
     def _execute_main_task(self):
-        self._run()
+        self._run_worker()
 
 if __name__ == "__main__":
 
@@ -213,11 +213,11 @@ if __name__ == "__main__":
 
     paper_trading = not 'live' in args
     remote_ib = 'remote' in args
-    revised = 'revised' in args
+    # revised = 'revised' in args
     continuous = not 'snapshot' in args
     no_initialize = 'noinit' in args
     wait_seconds = next((int(float(arg[5:])) for arg in args if arg.startswith('wait=')), 2)
-    strategy_name = next((arg[9:] for arg in args if arg.startswith('strategy=')), None)
+    # strategy_name = next((arg[9:] for arg in args if arg.startswith('strategy=')), None)
     action = next((arg[7:] for arg in args if arg.startswith('action=')), '')
     mode = next((arg[5:] for arg in args if arg.startswith('mode=')), 'live')
 
@@ -234,7 +234,7 @@ if __name__ == "__main__":
 
     # trade_manager = trade_manager.TradeManager(IB(), strategy_name, stop, revised=revised)
 
-    worker = LiveWorker(action=action, strategy_name=strategy_name, revised=revised, live_mode=mode, initialize=not no_initialize, 
+    worker = LiveWorker(action=action, live_mode=mode, initialize=not no_initialize, 
                               paper_trading=paper_trading, wait_seconds=wait_seconds, continuous=continuous, remote_ib=remote_ib)
     worker.run()
 
@@ -250,7 +250,7 @@ if __name__ == "__main__":
     #         '-stop_loss-': stop, 
     #         '-auto_quantity-': False, 
     #         '-quantity-': quantity, 
-    #         '-currency-': helpers.get_stock_currency_yf(symbol) or self.config.default_currency,
+    #         '-currency-': helpers.get_stock_currency_yf(symbol) or self.config.currency,
     #         '-profit_ratio-': self.config.profit_ratio, 
     #         '-offset_targets-': self.config.offset_targets,
     #         '-auto_stop_loss-': False
@@ -270,9 +270,9 @@ if __name__ == "__main__":
 #                 trig_time_min = trig_time.replace(second=0, microsecond=0) # Floor to minute
 #                 from_time = helpers.substract_duration_from_time(trig_time_min, self.look_backward)
 
-#                 df = self.manager.fetch_df(symbol, trig_time, from_time, self.file_format, self.step_duration)
+#                 df = self.tmanager.fetch_df(symbol, trig_time, from_time, self.file_format, self.step_duration)
 #             else:
-#                 df = self.manager.complete_df(symbol, self.file_format, self.step_duration)
+#                 df = self.tmanager.complete_df(symbol, self.file_format, self.step_duration)
             
 #             self._update_ticker(symbol, 'fetching', False)
 

@@ -17,7 +17,7 @@ class OOrder():
         self.stop_loss = stop_loss
         self.quantity = quantity
         self.order_type = type
-        self.currency = helpers.get_stock_currency_yf(symbol) or self.config.default_currency
+        self.currency = helpers.get_stock_currency_yf(symbol) or self.config.currency
         
 
 class TradeExecutor():
@@ -30,9 +30,9 @@ class TradeExecutor():
         account_values = self.ib.accountValues()
         self.ib.sleep(constants.CONSTANTS.PROCESS_TIME['long'])
         if account_values:
-            return float([accountValue.value for accountValue in self.ib.accountValues() if accountValue.tag == 'CashBalance' and accountValue.currency == self.config.default_currency][0])
+            return float([accountValue.value for accountValue in self.ib.accountValues() if accountValue.tag == 'CashBalance' and accountValue.currency == self.config.currency][0])
         else:
-            return self.config.initial_capital
+            return self.config.capital
 
     def execute_order(self, direction:int, oorder:OOrder):
         contract, mktData = helpers.get_symbol_mkt_data(self.ib, oorder.symbol, currency=oorder.currency)

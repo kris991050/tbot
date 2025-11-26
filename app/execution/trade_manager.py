@@ -1,4 +1,4 @@
-import sys, os, pandas as pd, backtrader as bt, pytz, re, numpy as np
+import sys, os, pandas as pd, backtrader as bt, pytz, re, math
 from datetime import datetime
 
 parent_folder = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -39,7 +39,7 @@ def get_strategy_instance(strategy_name:str, config:trading_config.TradingConfig
 
 
 class TradeManager:
-    def __init__(self, ib, config=None, strategy_name:str=None, stop=None, revised:bool=False, look_backward:str=None, 
+    def __init__(self, ib, config=None, strategy_name:str=None, stop=None, revised:bool=False, 
                  step_duration:str=None, base_folder:str=None, selector_type:str=None, timezone:pytz=None):
         self.ib = ib
         self.config = config or trading_config.TradingConfig().set_config(locals())
@@ -224,18 +224,59 @@ class TradeManager:
             return False, rrr  # Skip trade
         return True, rrr
 
-    def evaluate_quantity(self, prediction:float):
+    # def evaluate_quantity(self, prediction:float, capital:float, risk_pct:float):
+    #     if isinstance(self.config.size, int):
+    #         return self.config.size
+
+    #     elif self.config.size == 'auto':
+    #         if not self.config.pred_th or prediction < self.config.pred_th:
+    #             return 0
+            
+    #         tier_range = (1.0 - self.config.pred_th) / self.config.tier_max
+    #         quantity_factor = int((prediction - self.config.pred_th) / tier_range) + 1
+    #         quantity_factor = min(quantity, self.config.tier_max)
+
+    #         quantity = risk_pct * capital * quantity_factor
+
+    #         return quantity
+
+    def evaluate_quantity(self, prediction:float, price:float, capital:float, risk_pct:float, exp_factor:float=0.5):
+        '''
+        **Linear Scaling**: Position increases gradually as the prediction improves above the threshold.
+        **Exponential Scaling**: Small improvements in prediction lead to much larger increases in position size.
+        **Logarithmic Scaling**: Position size grows at a decreasing rate, starting more aggressively, but slowing down. Offers controlled scaling with a reduced impact for very high predictions.
+        **Sigmoidal Scaling**: Position size grows smoothly, with diminishing returns as the prediction improves. The position size increases quickly at first but then slows down, capping at a maximum value.
+        '''
         if isinstance(self.config.size, int):
             return self.config.size
 
-        elif self.config.size == 'auto':
-            if self.config.pred_th and prediction >= self.config.pred_th:
-                tier_range = (1.0 - self.config.pred_th) / self.config.tier_max
-                quantity = int((prediction - self.config.pred_th) / tier_range) + 1
+        elif isinstance(self.config.size, str):
+            growth_mode = helpers.set_var_with_constraints(self.config.size, CONSTANTS.POSITION_SIZING_MODE)
+            if not self.config.pred_th or prediction < self.config.pred_th:
+                return 0
+            
+            # Calculate the tier range (distance between prediction threshold and max prediction)
+            tier_range = (1.0 - self.config.pred_th) / self.config.tier_max
 
-                return min(quantity, self.config.tier_max)
-            else:
-                return 1
+            linear_factor = min(int((prediction - self.config.pred_th) / tier_range) + 1, self.config.tier_max)
+            exponential_factor = int(math.exp(exp_factor * (prediction - self.config.pred_th) / tier_range))
+            logarithmic_factor = int(math.log((prediction - self.config.pred_th) / tier_range + 1)) + 1
+            sigmoid_factor = int((1 / (1 + math.exp(-10 * (prediction - self.config.pred_th) / tier_range))) * self.config.tier_max)
+
+            if growth_mode == 'linear':
+                quantity_factor = linear_factor    
+            elif growth_mode == 'exponential':
+                quantity_factor = exponential_factor
+            elif growth_mode == 'logarithmic':
+                quantity_factor = logarithmic_factor
+            elif growth_mode == 'sigmoidal':
+                quantity_factor = sigmoid_factor
+
+            # Calculate the quantity based on the risk percentage and capital
+            risk_pct_adjusted = risk_pct * quantity_factor
+            quantity = min(math.ceil(risk_pct_adjusted * capital / price), capital * 0.9 / price) # 0.9 to keep a buffer and not buy more than the available capital
+            return quantity
+
 
     def apply_model_predictions(self, df:pd.DataFrame, symbol:str, return_proba:bool=True, shift_features:bool=False):
         if 'market_cap_cat' not in df.columns and 'market_cap' in df.attrs:
@@ -389,11 +430,11 @@ class TradeManager:
 
         return df 
     
-    def load_data_live(self, symbol, trig_time, to_time=None, file_format='parquet', block_add_sr=False):
+    def load_data_forward(self, symbol, trig_time, to_time=None, file_format='parquet', block_add_sr=False, look_backward:str=None):
 
         trig_time = trig_time.replace(second=0, microsecond=0) # Floor to minute
         to_time = to_time or trig_time
-        from_time = helpers.substract_duration_from_time(trig_time, self.config.look_backward)
+        from_time = Timeframe(look_backward).subtract_from_date(trig_time)
         
         # Fetch symbol
         df = self.fetch_df(symbol, from_time, to_time, file_format=file_format)
@@ -402,7 +443,7 @@ class TradeManager:
         df = self.enrich_df(symbol, from_time, to_time, file_format=file_format, block_add_sr=block_add_sr)
 
         if not df.empty:
-            duration = f"{helpers.timeframe_to_seconds(helpers.get_df_timeframe(df))}S"
+            duration = f"{Timeframe(helpers.get_df_timeframe(df)).to_seconds}S"
             adjusted_trig_time = helpers.substract_duration_from_time(trig_time, duration)
             df = df[(df['date'] >= adjusted_trig_time) & (df['date'] <= to_time)] if not df.empty else pd.DataFrame()
 

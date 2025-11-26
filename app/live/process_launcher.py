@@ -58,13 +58,13 @@ def run_live_L2_fetcher(paper_trading, wait_seconds):
 
 
 # def run_live_data_fetcher(paper_trading, wait_seconds, args_trade_manager_json, args_logger_json, tickers_list, timezone, initialize=True):
-#     fetcher = live_data_fetcher.LiveDataFetcher(args_manager=args_trade_manager_json, args_logger=args_logger_json, tickers_list=tickers_list, initialize=initialize, 
+#     fetcher = live_data_fetcher.LiveDataFetcher(args_tmanager=args_trade_manager_json, args_logger=args_logger_json, tickers_list=tickers_list, initialize=initialize, 
 #                                                 paper_trading=paper_trading, wait_seconds=wait_seconds, timezone=timezone)
 #     fetcher.run()
 
 
 # def run_live_data_enricher(paper_trading, wait_seconds, args_trade_manager_json, args_logger_json, tickers_list, timezone, initialize=True):
-#     fetcher = live_data_enricher.LiveDataEnricher(args_manager=args_trade_manager_json, args_logger=args_logger_json, tickers_list=tickers_list, initialize=initialize, 
+#     fetcher = live_data_enricher.LiveDataEnricher(args_tmanager=args_trade_manager_json, args_logger=args_logger_json, tickers_list=tickers_list, initialize=initialize, 
 #                                                   paper_trading=paper_trading, wait_seconds=wait_seconds, timezone=timezone)
 #     fetcher.run()
 

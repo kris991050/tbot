@@ -758,27 +758,35 @@ def get_index_etf(index):
     return index_map.get(index, '')
 
 
-def get_index_from_symbol(ib, symbol):
-
+def get_fundamentals_from_symbol(ib, symbol):
     contract = get_symbol_contract(ib, symbol)[0]
-
     fund = ib.reqFundamentalData(contract, reportType='ReportSnapshot', fundamentalDataOptions=[])
+    return ET.fromstring(fund) if fund else None
 
-    if fund:
-        report_xml = ET.fromstring(fund)
-        indexes = report_xml.findall('.//Indexconstituet')
-    else:
-        indexes = []
 
+def get_index_from_symbol(ib, symbol):
+    fund_xml = get_fundamentals_from_symbol(ib, symbol)
+    if not fund_xml:
+        return []
+    indexes = fund_xml.findall('.//Indexconstituet')
     return [index.text for index in indexes]
+
+
+# def get_currency_from_symbol(ib, symbol):
+#     fund_xml = get_fundamentals_from_symbol(ib, symbol)
+#     if not fund_xml:
+#         return None
+#     currency_element = fund_xml.find('.//ReportingCurrency')
+#     currency = currency_element.text if currency_element is not None else None
+#     return currency
 
 
 def get_tick_value(price):
      return  10 ** -int(str(price)[::-1].find('.'))
 
 
-def get_symbol_seed_list(seed:int, base_folder=PATHS.folders_path['market_data']):
-    stock_list_file = os.path.join(base_folder, f"stock_list_seed{seed}.csv")
+def get_symbol_seed_list(seed:int, base_folder:str=PATHS.folders_path['market_data']):
+    stock_list_file = os.path.join(base_folder, f"stock_list_seed{seed}.csv") if seed else None
     if not os.path.exists(stock_list_file):
         return []
 
@@ -852,14 +860,14 @@ def get_symbol_infos(ib:IB, symbol:str):
     except Exception as e: print("Could not fetch infos from Finviz for symbol ", symbol, ". Error: ", e)
     return {'avg_volume': avg_volume, 'rel_volume': rel_volume, 'floats': floats, 'market_cap': market_cap, 'index': index, 'last_earning_date': last_earning_date, 'news': news}
 
-def get_symbol_contract(ib, symbol, currency="USD", exchange=None):
+def get_symbol_contract(ib, symbol, currency=CONSTANTS.DEFAULT_CURRENCY, exchange=None):
 
     if symbol[:3] in get_forex_symbols_list():
         exchange = "IDEALPRO" if not exchange else exchange
         secType="CASH"
         primaryExch = ""
         if len(symbol) > 3:
-            currency = symbol[ len(symbol)-3:len(symbol)]
+            currency = symbol[len(symbol)-3:len(symbol)]
             symbol = symbol[0:3]
     else:
         exchange = "SMART" if not exchange else exchange
@@ -887,7 +895,7 @@ def get_symbol_contract(ib, symbol, currency="USD", exchange=None):
     return contract, symbol
 
 
-def get_symbol_mkt_data(ib, symbol, currency="USD", exchange=None):
+def get_symbol_mkt_data(ib, symbol, currency=CONSTANTS.DEFAULT_CURRENCY, exchange=None):
 
     # ib, ibConnection = IBKRConnect(ib)
 
