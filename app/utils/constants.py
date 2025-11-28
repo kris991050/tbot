@@ -144,7 +144,7 @@ class PATHS():
                 folders_path['market_data'] = os.path.join(root_folder, 't_data')
                 folders_path['download'] = '/home/ubuntu/Downloads'
                 IB_GATEWAY_PATH = ''
-                python_path = '~/T/venv312/bin/python3'
+                python_path = '/home/ubuntu/T/venv312/bin/python3'
 
         folders_path['hist_market_data'] = os.path.join(folders_path['market_data'], 'hist_data')
         folders_path['live_data'] = os.path.join(folders_path['market_data'], 'live_data')

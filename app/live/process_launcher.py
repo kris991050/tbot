@@ -144,10 +144,10 @@ def get_terminal_command(fetcher_func, args=()):
 
     # Ensure the command is properly quoted and escaped for PowerShell
     # In PowerShell, we should escape the command properly using shlex.quote() to avoid extra parameters
-    escaped_command = shlex.quote(command)
+    # escaped_command = shlex.quote(command)
 
     if system == sys_list['linux']:
-        return f'gnome-terminal -- bash -c "{escaped_command}; exec bash"'
+        return f'tmux new-session -d "{command}"'
     elif system == sys_list['macos']:
         apple_script = f'''
         tell application "Terminal"
@@ -182,7 +182,8 @@ def tail_log_in_new_terminal(log_path, timeout=60):
         # Windows: Use 'type' to dump existing content, then tail
         command = f'start cmd /k "type {log_path} & powershell -Command Get-Content -Path {log_path} -Wait"'
     elif system == "Linux":
-        command = f'gnome-terminal -- bash -c "tail -f {log_path}; exec bash"'
+        command =  f'tmux new-session -d "tail -f {log_path}"'
+        # command = f'gnome-terminal -- bash -c "tail -f {log_path}; exec bash"'
     elif system == "Darwin":
         command = f'osascript -e \'tell application "Terminal" to do script "tail -f {log_path}"\''
     else:

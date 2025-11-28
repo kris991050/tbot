@@ -154,6 +154,7 @@ class LiveOrchestrator:
         if self.new_terminal:
             command = process_launcher.get_terminal_command(target, args)
             if command:
+                print(f"▶️ Starting process {pname}...")
                 process = subprocess.Popen(command, shell=True)
                 ib.sleep(5 * CONSTANTS.PROCESS_TIME['long'])
                 processes = helpers.get_process_by('cmdline', pname)
