@@ -36,7 +36,7 @@ class CONSTANTS():
         # TZ_LOCAL = pytz.timezone(tzlocal.get_localzone().key if hasattr(tzlocal.get_localzone(), 'key') else str(tzlocal.get_localzone()))
 
         DEFAULT_CURRENCY = 'USD'
-        
+
         POLYGON_API_KEY = os.getenv('POLYGON_API_KEY')
         POLYGON_DATA_DELAY = '15min'
         POLYGON_DATA_MAX_BACKWARD = '5Y'
@@ -59,7 +59,7 @@ class CONSTANTS():
                        'month': 2592000, 'months': 2592000, 'm': 2592000, 'M': 2592000, 'year': 31536000, 'years': 31536000, 'y': 31536000, 'Y': 31536000}
 
         MARKET_CAP_CATEGORIES = {'Nano': 50e6, 'Micro': 300e6, 'Small': 2e9, 'Mid': 10e9, 'Large': 200e9, 'Mega': float('inf')}
-        
+
         ENTRY_DELAY_CUTOFF_TIMEFRAME = '1h'
 
         WARMUP_MAP = {'1min':'1M', '5min':'3M', '15min':'4M', '1h':'6M', '4h':'1Y', '1D':'2Y', '1W':'5Y', '2min':'2M', '30min':'5M'}
@@ -84,13 +84,13 @@ class CONSTANTS():
                 {'category': 'volume', 'names': ['vwap', 'r_vol', 'avg_vol', 'pm_vol']},
                 {'category': 'volatility', 'names': ['bband', 'atr', 'day_range', 'volatility_ratio', 'volatility_change']},
                 {'category': 'momentum', 'names': ['rsi', 'awesome']},
-                {'category': 'price', 'names': ['gap', 'change']}, 
+                {'category': 'price', 'names': ['gap', 'change']},
                 {'category': 'vpa', 'names': ['vpa']}
                 ]
 
         # Define mappings for candle patterns
         PATTERN_TYPES = [
-                {'category': 'candle', 'names': ['hammer', 'engulfing', 'marubozu', 'doji', 'volume_spike', 'bullish_score', 'bearish_score', 
+                {'category': 'candle', 'names': ['hammer', 'engulfing', 'marubozu', 'doji', 'volume_spike', 'bullish_score', 'bearish_score',
                                                  'score_bias', 'return', 'directional_bias', 'bias_trend', 'hybrid_bias', 'hybrid_direction']},
                 {'category': 'divergence', 'names': ['divergence']},
                 {'category': 'range', 'names': ['low_volume', 'bband_width_pct', 'atr_in_range', 'inside_bar', 'dbscan_cluster', 'consolidation', 'breakout']},
@@ -98,14 +98,14 @@ class CONSTANTS():
                 {'category': 'trend', 'names': ['trend']},
                 {'category': 'index_trend', 'names': ['index_trend']}
                 ]
-        
+
         # Define mappings for levels
         LEVEL_TYPES = [
                 {'category': 'daily', 'names': ['levels', 'cam_position', 'cam_D_position']},
                 {'category': 'monthly', 'names': ['levels_M', 'cam_M_position']},
                 {'category': 'camarilla', 'names': ['pivots', 'cam_']}
                 ]
-        
+
         # Define support/resistance (SR) settings
         SR_SETTINGS = [{'timeframe': '1W', 'lookback': '5Y', 'refresh_rate': '1M', 'granularity': 1, 'count_threshold': 2, 'proximity_threshold': 0.5},
                       {'timeframe': '1D', 'lookback': '2Y', 'refresh_rate': '1W', 'granularity': 1, 'count_threshold': 2, 'proximity_threshold': 0.5},
@@ -130,18 +130,21 @@ class PATHS():
                 folders_path['market_data'] = os.path.join(document_folder, 'market_data')
                 folders_path['download'] =  '/Users/user/Downloads'
                 IB_GATEWAY_PATH = ''
+                python_path = '/Users/user/venv3.12/bin/python3'
 
         elif SYS == SYS_LIST['windows']:
                 folders_path['journal'] = os.path.join(root_folder, 'T_journal')
                 folders_path['market_data'] = os.path.join(root_folder, 't_data')
                 folders_path['download'] = 'C:/Users/ChristopheReis/Downloads'
                 IB_GATEWAY_PATH = 'C:/Jts/ibgateway/1041/ibgateway.exe'
-        
+                python_path = 'python3'
+
         elif SYS == SYS_LIST['linux']:
                 folders_path['journal'] = os.path.join(root_folder, 't_journal')
                 folders_path['market_data'] = os.path.join(root_folder, 't_data')
                 folders_path['download'] = '/home/ubuntu/Downloads'
                 IB_GATEWAY_PATH = ''
+                python_path = '~/T/venv312/bin/python3'
 
         folders_path['hist_market_data'] = os.path.join(folders_path['market_data'], 'hist_data')
         folders_path['live_data'] = os.path.join(folders_path['market_data'], 'live_data')
