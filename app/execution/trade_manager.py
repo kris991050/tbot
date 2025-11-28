@@ -409,7 +409,7 @@ class TradeManager:
         # combined.index = combined['date']  # use date as index
 
         if self.config.pred_vlty_type == 'garch':
-            row['pred_vlty'] = helpers.calculate_garch_volatility(close_series)
+            row['pred_vlty'] = indicators.IndicatorsUtils.calculate_garch_volatility(close_series)
         if self.config.pred_vlty_type == 'ewma':
             row['pred_vlty'] = indicators.IndicatorsUtils.calculate_pred_vlty_recursive(close_series, window=window_tf.to_timedelta, type='ewma')
 

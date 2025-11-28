@@ -47,13 +47,15 @@ ALLOWED_FETCHERS = {
 }
 
 
-def run_live_scans_fetcher(paper_trading, wait_seconds):
-    fetcher = live_scans_fetcher.LiveScansFetcher(paper_trading=paper_trading, wait_seconds=wait_seconds)
+def run_live_scans_fetcher(wait_seconds:int, live_mode:str, ib_client_id:int, paper_trading:str, remote_ib:bool):
+    fetcher = live_scans_fetcher.LiveScansFetcher(wait_seconds=wait_seconds, live_mode=live_mode, ib_client_id=ib_client_id, paper_trading=paper_trading, 
+                                                  remote_ib=remote_ib)
     fetcher.run()
 
 
-def run_live_L2_fetcher(paper_trading, wait_seconds):
-    fetcher = live_L2_fetcher.LiveL2Fetcher(paper_trading=paper_trading, wait_seconds=wait_seconds, ib_disconnect=True)
+def run_live_L2_fetcher(wait_seconds:int, live_mode:str, ib_client_id:int, paper_trading:str, remote_ib:bool):
+    fetcher = live_L2_fetcher.LiveL2Fetcher(wait_seconds=wait_seconds, live_mode=live_mode, ib_client_id=ib_client_id, paper_trading=paper_trading, 
+                                                  remote_ib=remote_ib, ib_disconnect=True)
     fetcher.run()
 
 

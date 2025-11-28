@@ -1,4 +1,4 @@
-import os, sys, time, requests, csv, re, prettytable, numpy as np, json, speedtest, pandas_market_calendars, arch
+import os, sys, time, requests, csv, re, prettytable, numpy as np, json, speedtest, pandas_market_calendars
 import xml.etree.ElementTree as ET, traceback, speedtest, typing, chardet, pickle, filelock, yfinance, polygon, re
 import math, pandas as pd, psutil, gc#, dask.dataframe as dd
 from datetime import datetime, timedelta
@@ -163,64 +163,52 @@ def get_stock_currency_yf(symbol:str):
         return CONSTANTS.DEFAULT_CURRENCY
 
 
-def calculate_garch_volatility(price_data:pd.Series, p:int=1, q:int=1, forecast_horizon:int=1) -> float:
-    """
-    Calculate the volatility using a GARCH model.
-
-    :param price_data: A pandas Series of historical price data.
-    :param p: The order of the GARCH model (GARCH(p, q)).
-    :param q: The order of the GARCH model (GARCH(p, q)).
-    :param forecast_horizon: The number of steps ahead to forecast volatility.
-    :return: Forecasted volatility.
-    """
-    # Calculate returns
-    returns = price_data.pct_change().dropna() * 100  # Percentage returns
-    returns_scaled = returns * 10  # Scaling factor recommended to avoid model convergence issues
-
-    # Fit GARCH model
-    model = arch.arch_model(returns_scaled, vol='Garch', p=p, q=q)
-    model_fit = model.fit(disp="off")
-
-    # Forecast volatility for the next forecast_horizon periods
-    forecast = model_fit.forecast(horizon=forecast_horizon)
-    pred_vlty = forecast.variance.values[-1, 0]  # Forecasted variance for the last period
-    pred_vlty = np.sqrt(pred_vlty)  / 10  # Rescale the volatility  (Volatility is the square root of variance)
-
-    return pred_vlty
-
-
-def calculate_ewma_volatility(price_data:pd.Series, lambda_:float=0.94, prev_volatility:float=0.0) -> float:
-    """
-    Calculate the volatility using the EWMA method.
-
-    :param price_data: A pandas Series of historical price data.
-    :param lambda_: The smoothing factor (default is 0.94).
-    :param prev_volatility: The previous volatility value (default is 0.0 for the first period).
-    :return: Forecasted volatility.
-    """
-    # Calculate returns
-    returns = price_data.pct_change().dropna() * 100  # Percentage returns
-    squared_returns = returns ** 2
-
-    # Calculate the EWMA volatility
-    if prev_volatility == 0.0:  # If it's the first calculation, initialize volatility
-        volatility = np.sqrt(squared_returns.mean()).values[0]  # Use the mean of squared returns as initial volatility
-    else:
-        volatility = np.sqrt(lambda_ * squared_returns.iloc[-1] + (1 - lambda_) * prev_volatility ** 2).values[0]
-
-    return volatility
-
-
-def calculate_weighted_atr(atr_series:pd.Series, lambda_:float=0.94):
-    """
-    Calculate a weighted ATR using an exponential moving average (EMA).
+def get_process_by(attr:str, value:str):
+    attr_list = ['cmdline', 'pid', 'name', 'status', 'create_time']
+    # 'exe', 'cpu_times', 'cpu_percent', 'memory_percent', 'memory_info', 'io_counters', 'num_threads', 'threads', 'open_files', 'environ', 'nice', 'cpu_affinity'
+    if not value:
+        print(f"⚠️ Value for 'value' is needed")
+        return[]
+    if not attr or attr not in attr_list:
+        print(f"⚠️ 'attr' must be within {attr_list}")
+        return[]
     
-    :param atr_series: The ATR series.
-    :param lambda_: The smoothing factor (default 0.94).
-    :return: The weighted ATR series.
-    """
-    # Apply the EMA to the ATR series
-    return atr_series.ewm(span=(2 / (1 - lambda_)) - 1, adjust=False).mean()
+    pall = psutil.process_iter(attr_list)
+    matched_processes = []
+    
+    for proc in pall:
+        proc_info = proc.info.get(attr, None)
+        if not proc_info:
+            continue
+
+        condition_num = isinstance(proc_info, (int, float)) and proc_info == value
+        condition_str = isinstance(proc_info, str) and value in proc_info
+        condition_list = isinstance(proc_info, list) and all(isinstance(p, str) for p in proc_info) and any([value in p for p in proc_info])
+        if condition_num or condition_str or condition_list:
+            matched_processes.append({**proc.info, 
+                                        'create_time': datetime.fromtimestamp(proc.info['create_time']).strftime('%Y-%m-%d %H:%M:%S') 
+                                        if 'create_time' in proc.info else None})
+    return matched_processes
+    # matched_processes = [{
+    #     **proc.info, # Copy all info of the process
+    #     'create_time': datetime.fromtimestamp(proc.info['create_time']).strftime('%Y-%m-%d %H:%M:%S') if 'create_time' in proc.info else None}
+    #     for proc in pall if proc.info.get(attr, '') and \
+    #         (any([value in p for p in proc.info.get(attr, '')]) \
+    #          if not isinstance(proc.info.get(attr, ''), (int, float)) else proc.info.get(attr, '') == value)  # Filter based on the value in the specified attribute
+    #     ]
+    # return matched_processes
+
+
+def list_all_processes():
+    """List all running processes with PID, name, and status."""
+    processes = []
+    for proc in psutil.process_iter(['pid', 'name', 'status', 'username', 'cmdline']):
+        try:
+            processes.append(proc.info)
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            # Ignore processes that no longer exist or can't be accessed
+            continue
+    return processes
 
 
 
