@@ -1,0 +1,27 @@
+services:
+  tbot:
+    build:
+      context: .
+    container_name: tbot
+    networks:
+    #  - ib-gateway-docker_trading-net
+      - trading-net
+    #network_mode: "host"
+    environment:
+      - IB_GATEWAY_HOST=ib-gateway # Use service name for hostname
+      - IB_GATEWAY_PORT_PAPER=4004
+      - IB_GATEWAY_PORT_LIVE=4003
+    ports:
+      - "5000:5000"  # Port for the Flask web server
+      #- "4001:4003"
+      #- "4002:4002"
+    #restart: always
+    volumes:
+      # Mount the t_data and t_journal directories from the parent folder (T/)
+      - ../t_data:/t_data
+      - ../t_journal:/t_journal
+
+networks:
+  #ib-gateway-docker_trading-net:
+  trading-net:
+    external: true  # Must be the same as the network in ib-gateway-docker's docker-compose

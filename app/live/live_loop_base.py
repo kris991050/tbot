@@ -16,6 +16,15 @@ class LiveLoopBase:
         self.live_mode = helpers.set_var_with_constraints(live_mode, CONSTANTS.MODES['live'])
         self.ib_client_id = ib_client_id
         self.config = self._resolve_config(config, locals())
+
+        print("========================================")
+        print(f"remote_ib = {remote_ib}")
+        print(f"paper_trading = {paper_trading}")
+        print(f"self.config.remote_ib = {self.config.remote_ib}")
+        print(f"self.config.paper_trading = {self.config.paper_trading}")
+        print("========================================")
+        IB.sleep(5)
+
         self.wait_seconds = wait_seconds if wait_seconds else None
         self.continuous = continuous
         self.ib = IB()
@@ -39,6 +48,9 @@ class LiveLoopBase:
     
     def _connect_ib(self):
         print("\n🔌 Connecting IB")
+        print("-------------------------------------------")
+        print(f"remote_ib = {self.config.remote_ib}")
+        print("-------------------------------------------")
         self.ib, _ = helpers.IBKRConnect_any(self.ib, paper=self.config.paper_trading, client_id=self.ib_client_id, remote=self.config.remote_ib)
 
     def _disconnect_ib(self):

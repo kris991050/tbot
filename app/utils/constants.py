@@ -15,6 +15,19 @@ def get_sys(display=False):
         return SYS
 
 
+def is_docker():
+    # Check if running inside Docker container
+    try:
+        with open('/proc/1/cgroup', 'r') as f:
+            if 'docker' in f.read():
+                return True
+    except FileNotFoundError:
+        return False
+
+    # Alternative check for the existence of /.dockerenv (another Docker-specific file)
+    return os.path.exists('/.dockerenv')
+
+
 class CONSTANTS():
 
         SYS_LIST = {'macos': 'Darwin', 'windows': 'Windows', 'linux': 'Linux'}
@@ -24,10 +37,10 @@ class CONSTANTS():
         MEMORY_THRESHOLD_MB = 5000
         MAX_CORE_PARTITIONS = 10
 
-        IB_IP_LOCAL = '127.0.0.1'
+        IB_IP_LOCAL = os.environ.get('IB_GATEWAY_HOST', 'localhost')#'127.0.0.1'#'ib-gateway'
         IB_IP_REMOTE = '18.116.186.191'
-        IB_PORT_LIVE = 7496
-        IB_PORT_PAPER = 4002#7497
+        IB_PORT_LIVE = int(os.environ.get('IB_GATEWAY_PORT_LIVE', 7496))#7496
+        IB_PORT_PAPER = int(os.environ.get('IB_GATEWAY_PORT_PAPER', 4002))#4002#7497
         IB_MAX_CLIENTS = 10
 
         TZ_WORK_STR = 'US/Eastern'
@@ -133,7 +146,7 @@ class PATHS():
                 python_path = '/Users/user/venv3.12/bin/python3'
 
         elif SYS == SYS_LIST['windows']:
-                folders_path['journal'] = os.path.join(root_folder, 'T_journal')
+                folders_path['journal'] = os.path.join(root_folder, 't_journal')
                 folders_path['market_data'] = os.path.join(root_folder, 't_data')
                 folders_path['download'] = 'C:/Users/ChristopheReis/Downloads'
                 IB_GATEWAY_PATH = 'C:/Jts/ibgateway/1041/ibgateway.exe'
@@ -144,7 +157,8 @@ class PATHS():
                 folders_path['market_data'] = os.path.join(root_folder, 't_data')
                 folders_path['download'] = '/home/ubuntu/Downloads'
                 IB_GATEWAY_PATH = ''
-                python_path = '/home/ubuntu/T/venv312/bin/python3'
+                os.path.join(root_folder, 'venv312/bin/python3')
+                # python_path = '/home/ubuntu/T/venv312/bin/python3'
 
         folders_path['hist_market_data'] = os.path.join(folders_path['market_data'], 'hist_data')
         folders_path['live_data'] = os.path.join(folders_path['market_data'], 'live_data')

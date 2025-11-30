@@ -2,11 +2,9 @@ ping3
 ib_insync
 backtrader
 ifcfg
-platform
 datetime
 pytz
 numpy
-math
 pandas
 requests
 bs4
@@ -32,3 +30,4 @@ numba
 xgboost
 shap
 arch
+flask

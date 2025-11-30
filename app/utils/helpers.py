@@ -81,7 +81,12 @@ def IBKRConnect(ib:IB=IB(), paper:bool=True, client_id:int=None, remote:bool=Tru
     # clientId = 1 if not client_id else client_id
 
     client_ids = [client_id] if client_id else range(1, CONSTANTS.IB_MAX_CLIENTS + 1)
-    
+    print("--------------------------------")
+    print(f"ib_ip = {ib_ip}")
+    print(f"port_number = {port_number}")
+    print(f"client_ids = {client_ids}")
+    print(f"paper = {paper}")
+    print("--------------------------------")
     try:
         for clientId in client_ids:
             if ib.isConnected():
