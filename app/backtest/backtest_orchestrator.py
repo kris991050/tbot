@@ -14,13 +14,13 @@ from execution import trade_manager
 
 
 class BacktestOrchestrator:
-    def __init__(self, ib:IB, strategy_name:str, stop=None, revised:bool=False, symbols:list=None, seed:int=None, timeframe=Timeframe(), 
-                 config=None, engine_type:str='custom', selector_type:str='rf', mode:str='backtest', timezone=None, 
-                 look_bacward:str=None, step_duration:str=None):
-        self.tmanager = trade_manager.TradeManager(ib, config, strategy_name, stop, revised=revised, look_backward=look_bacward, step_duration=step_duration, 
+    def __init__(self, ib:IB, strategy_name:str, stop=None, revised:bool=False, symbols:list=None, seed:int=None, timeframe=Timeframe(),
+                 config=None, engine_type:str='custom', selector_type:str='rf', mode:str='backtest', timezone=None,
+                 look_backward:str=None, step_duration:str=None):
+        self.tmanager = trade_manager.TradeManager(ib, config, strategy_name, stop, revised=revised, look_backward=look_backward, step_duration=step_duration,
                                                   selector_type=selector_type, timezone=timezone)
         self.strategy_required_columns = self.tmanager.get_strategy_required_columns()
-        self.look_backward = look_bacward or CONSTANTS.WARMUP_MAP[self.tmanager.strategy_instance.timeframe.pandas]
+        self.look_backward = look_backward or CONSTANTS.WARMUP_MAP[self.tmanager.strategy_instance.timeframe.pandas]
         # self.required_columns = self.tmanager.get_required_columns()
         self.seed = seed
         self.engine_type = engine_type
@@ -36,7 +36,7 @@ class BacktestOrchestrator:
         # self.data_folder = os.path.join(base_folder, 'backtest_data')
         # os.makedirs(self.data_folder, exist_ok=True)
         self.checkpoint_file_path = os.path.join(self.outputs_folder, 'test_checkpoint.json')
-    
+
     def _save_checkpoint(self, completed_symbol_dates):
         def safe_parse_time(item):
             try:
@@ -49,7 +49,7 @@ class BacktestOrchestrator:
             'completed_symbol_dates': sorted(list(completed_symbol_dates), key=safe_parse_time)
         }
         helpers.save_json(checkpoint_data, self.checkpoint_file_path)
-    
+
     def _load_checkpoint(self):
         if os.path.exists(self.checkpoint_file_path):
             checkpoint_data = helpers.load_json(self.checkpoint_file_path)
@@ -82,7 +82,7 @@ class BacktestOrchestrator:
         # test_from = pd.Timestamp('2025-08-01 04:00:00', tz=CONSTANTS.TZ_WORK)
 
         df = self.tmanager.enrich_df(symbol, file_format=file_format, select_features=False)
-        
+
         # Trim again to ensure it is trimmed
         df = helpers.trim_df(df, from_time=test_from, to_time=test_to)
 
@@ -100,7 +100,7 @@ class BacktestOrchestrator:
             raise ValueError(f"Unknown engine type: {self.engine_type}")
 
     def _run_backtest_engine(self, df, symbol):
-        
+
         # df, _ = features_processor.apply_feature_transformations(df, drop=False)
         # df = self.tmanager.trainer.preprocessor.prepare_features(df, self.tmanager.model, display_features=False, drop=False)
         df = self.tmanager.apply_model_predictions(df, symbol)
@@ -121,7 +121,7 @@ class BacktestOrchestrator:
         trades = engine.run()
         self.all_trades.extend(trades)
         print(f"✅ Backtest completed for {symbol}\n")
-        
+
     def run(self):
         failed_symbols = []
         if self.mode == 'backtest':
@@ -131,20 +131,20 @@ class BacktestOrchestrator:
                 if df.empty:
                     print(f"❌ No data could be loaded for {symbol}")
                     continue
-                
+
                 try:
                     self._run_backtest_engine(df, symbol)
                 except Exception as e:
                     print(f"Could not run backtest for {symbol}. Error: {e}  |  Full error: ", traceback.format_exc())
                     failed_symbols.append(symbol)
-            
+
             self.summarize_and_save(self.all_trades)
 
         elif self.mode == 'forward':
             completed_symbol_dates = self._load_checkpoint()
             dates_list = helpers.get_dates_list(datetime.date(2025, 9, 28), datetime.date(2025, 10, 1))#days_ago=12)
             # dates_list = helpers.get_dates_list(datetime.date(2025, 5, 29), datetime.date(2025, 6, 1))#days_ago=12)
-            
+
             for date_assess in dates_list:
                 df_csv_file = self.tmanager.get_symbols_from_daily_data_folder(date_assess)
                 if df_csv_file.empty:
@@ -166,10 +166,10 @@ class BacktestOrchestrator:
                     trig_time = pd.to_datetime(df_csv_file["Time"].iloc[i]).tz_localize(CONSTANTS.TZ_WORK) if not pd.isna(df_csv_file["Time"].iloc[i]) else None
                     th_times = CONSTANTS.TH_TIMES['end_of_day']
                     to_time = trig_time.normalize() + pd.Timedelta(hours=th_times.hour, minutes=th_times.minute, seconds=th_times.second) if trig_time else None
-                    
+
                     df = self.tmanager.load_data_forward(symbol, trig_time, to_time, file_format='parquet', look_backward=self.look_backward) \
                         if (trig_time and to_time) else pd.DataFrame()
-                    
+
                     if not df.empty:
                         try:
                             self._run_backtest_engine(df, symbol)
@@ -178,12 +178,12 @@ class BacktestOrchestrator:
                             failed_symbols.append(symbol)
                     else:
                         print(f"❌ No data could be loaded for {symbol}")
-                    
+
                     completed_symbol_dates.add(key)
                     self._save_checkpoint(completed_symbol_dates)
 
             self.summarize_and_save(self.all_trades)
-        
+
         print(f"\n🚩 Failed symbols: {failed_symbols}\n")
 
     def summarize_and_save(self, all_trades):
@@ -202,7 +202,7 @@ class BacktestOrchestrator:
             "symbol": os.path.join(self.outputs_folder, f"summary_symbol_{self.file_name_pattern}.csv"),
             "mcap": os.path.join(self.outputs_folder, f"summary_market_cap_{self.file_name_pattern}.csv")
         }
-        
+
         os.makedirs(self.outputs_folder, exist_ok=True)
         helpers.save_df_to_file(df_trades, paths["log"], 'csv')
         helpers.save_df_to_file(summary, paths["summary"], 'csv')
@@ -237,19 +237,19 @@ if __name__ == "__main__":
     symbols = [symbol] if symbol else []
     # symbols = ['ALL', 'CME']
 
-    orchestrator = BacktestOrchestrator(ib, strategy_name, revised=revised, stop=stop, symbols=symbols, seed=seed, engine_type=engine_type, 
+    orchestrator = BacktestOrchestrator(ib, strategy_name, revised=revised, stop=stop, symbols=symbols, seed=seed, engine_type=engine_type,
                                             selector_type=selector, mode=mode)
     orchestrator.run()
-    
+
 
     # if not multpile_runs:
-    #     orchestrator = BacktestOrchestrator(ib, strategy_name, revised=revised, stop=stop, symbols=symbols, seed=seed, engine_type=engine_type, 
+    #     orchestrator = BacktestOrchestrator(ib, strategy_name, revised=revised, stop=stop, symbols=symbols, seed=seed, engine_type=engine_type,
     #                                         selector_type=selector, mode=mode)
     #     orchestrator.run()
     # else:
     #     for entry_delay in [0, 1]:
     #         for stop in ['levels']:
-    #             for 
-    #     orchestrator = BacktestOrchestrator(ib, strategy_name, revised=revised, stop=stop, symbols=symbols, seed=seed, engine_type=engine_type, 
+    #             for
+    #     orchestrator = BacktestOrchestrator(ib, strategy_name, revised=revised, stop=stop, symbols=symbols, seed=seed, engine_type=engine_type,
     #                                         selector_type=selector, entry_delay=entry_delay, mode=mode)
     #     orchestrator.run()

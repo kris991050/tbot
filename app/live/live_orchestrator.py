@@ -1,52 +1,37 @@
-import os, sys, pandas as pd, subprocess, multiprocessing, psutil#, tqdm, asyncio, concurrent.futures
-from datetime import datetime
+import os, sys, pandas as pd, threading#, tqdm, asyncio, concurrent.futures
 from ib_insync import *
 
 parent_folder = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_folder)
 
-from utils import helpers
+from utils import helpers, process_manager
 from utils.constants import CONSTANTS
 from execution import trade_manager
-import live_data_logger, process_launcher, trading_config
+from web import web_tbot
+import live_data_logger, trading_config
 
-
-# class Simulator:
-#     def __init__(self, timezone:pytz, mode:str='live'):
-#         self.tz = timezone or CONSTANTS.TZ_WORK
-#         self.mode = helpers.set_var_with_constraints(mode, CONSTANTS.MODES['live'])
-#         self.sim_start = self.tz.localize(datetime(2025, 9, 25, 9, 14, 0))
-#         self.sim_max_time = timedelta(hours=4, minutes=0)
-#         self.sim_offset = datetime.now(self.tz) - self.sim_start if self.mode == 'sim' else timedelta(0) if self.mode == 'live' else None
 
 class LiveOrchestrator:
-    def __init__(self, ib, max_fetchers:int=2, max_enrichers:int=2, new_terminal:bool=True, tail_log:bool=True, seed:int=None, strategy_name:str=None, stop=None, 
-                 step_duration:str=None, revised:bool=None, live_mode:str='live', paper_trading:bool=None, file_format:str=None, remote_ib:bool=None, timezone=None):
-    # def __init__(self, ib, strategy_name:str, stop, target:str=None, timeframe:str=None, look_backward:str='1M', step_duration:str='1W', revised:bool=False, 
-    #              max_fetchers:int=2, max_enrichers:int=2, mode:str='live', paper_trading:bool=True, timezone=None):
-        self.ib = ib
+    def __init__(self, max_fetchers:int=2, max_enrichers:int=2, new_terminal:bool=True, tail_log:bool=True, seed:int=None, strategy_name:str=None, stop=None,
+                 look_backward:str=None, revised:bool=None, live_mode:str='live', paper_trading:bool=None, file_format:str=None, remote_ib:bool=None, timezone=None):
+        self.ib = IB()
+        self.look_backward = look_backward
         self.live_mode = helpers.set_var_with_constraints(live_mode, CONSTANTS.MODES['live'])
         self.config = trading_config.TradingConfig(live_mode=self.live_mode).set_config(locals())
-
-        # self.live_mode = helpers.set_var_with_constraints(self.config.live_mode, CONSTANTS.MODES['live'])
-        self.tmanager = trade_manager.TradeManager(ib, config=self.config)
+        self.tmanager = trade_manager.TradeManager(self.ib, config=self.config)
         self.logger = live_data_logger.LiveDataLogger(config=self.config)
         self.config.save_config(self.logger.config_file_path)
-        
-        # self.tmanager = trade_manager.TradeManager(ib, strategy_name, stop, revised=revised, look_backward=self.config.look_backward, 
-        #                                           step_duration=self.config.step_duration, config=None, timezone=self.config.timezone)
-        # self.simulator = Simulator(self.tmanager.tz, self.mode)
-        # self.logger = live_data_logger.LiveDataLogger(mode=self.mode, sim_offset=self.config.sim_offset, timezone=self.config.timezone)
 
-        # self.scan_rate = timeframe_handler.TimeframeHandler.timeframe_to_seconds(self.tmanager.timeframe)
-        self.scan_rate = self.tmanager.strategy_instance.timeframe.to_seconds
         self.max_fetchers = max_fetchers
         self.max_enrichers = max_enrichers
         self.new_terminal = new_terminal
         self.tail_log = tail_log
-        # List to store subprocess.Popen objects (or their PIDs)
+        self.workers_list = {'white': ['scans', 'L2', 'queue'], 'blue': ['fetch', 'enrich', 'execut']}
         self.processes = []
-        self.proc_params = self._set_processes_params()
+        self.workers_params = self._build_workers_params()
+        self.processes_params = self._build_processes_params()
+        self.pmanager = process_manager.ProcessManager(processes_params=self.processes_params, processes=self.processes, new_terminal=self.new_terminal,
+                                                       tail_log=self.tail_log, timezone=self.tmanager.tz)
         # self.mtp_manager = multiprocessing.Manager()
         # self.tickers_list = self.mtp_manager.dict()
         # self.fetch_queue = self.mtp_manager.Queue()
@@ -58,197 +43,132 @@ class LiveOrchestrator:
         # self.enrich_queue = self.logger.get_queue('enrich', lock=True)
         # self.execite_queue = self.logger.get_queue('execut', lock=True)
 
-    def _set_processes_params(self):
-        log_folder = helpers.get_path_daily_logs_folder()
-        scan_rate_min = int(self.scan_rate / 60)
-        return {
-            'scans': {'wait_seconds': 3 * 60, 'log_path': os.path.join(log_folder, 'process_scans_fetcher.log'), 'ib_client_id': 9}, 
-            'L2': {'wait_seconds': 5 * 60, 'log_path': os.path.join(log_folder, 'process_L2_fetcher.log'), 'ib_client_id': 10}, 
-            'fetch': {'wait_seconds': 1 * scan_rate_min, 'log_path': os.path.join(log_folder, 'process_data_fetcher.log'), 'ib_client_id': None}, 
-            'enrich': {'wait_seconds': 1 * scan_rate_min, 'log_path': os.path.join(log_folder, 'process_data_enricher.log'), 'ib_client_id': None},
-            'queue': {'wait_seconds': 20, 'log_path': os.path.join(log_folder, 'process_queue_manager.log'), 'ib_client_id': 8},
+        # Flask setup
+        self.webserver = web_tbot.WebTbotServer(self.processes)
+
+    def _build_workers_params(self):
+        scan_rate_min = int(self.tmanager.strategy_instance.timeframe.to_seconds / 60)
+        return  {
+            'scans': {'wait_seconds': 3 * 60, 'ib_client_id': 9, 'pname': 'scans_fetcher'},
+            'L2': {'wait_seconds': 5 * 60, 'ib_client_id': 10, 'pname': 'L2_fetcher'},
+            'queue': {'wait_seconds': 20, 'ib_client_id': -1, 'pname': 'queue_manager'},
+            'fetch': {'wait_seconds': 1 * scan_rate_min, 'ib_client_id': None, 'pname': 'data_fetcher'},
+            'enrich': {'wait_seconds': 1 * scan_rate_min, 'ib_client_id': None, 'pname': 'data_enricher'},
+            'execut': {'wait_seconds': 1 * scan_rate_min, 'ib_client_id': None, 'pname': 'data_executer'},
             'orchestrator': {'wait_seconds': 20}#5 * scan_rate_min}
         }
 
-    # def _organize_tickers_list(self, symbols_scanner:list):
-    #     # Add new tickers
-    #     for symbol in self.symbols_seed + symbols_scanner:
-    #         self.tickers_list = self.logger.load_tickers_list(lock=True)
-    #         if symbol not in self.tickers_list:
-    #             self.tickers_list[symbol] = self.logger.initialize_ticker()
-    #             self.logger.save_tickers_list(self.tickers_list, lock=True)
-    #         else:
-    #             if not self.tickers_list[symbol]['active']:
-    #                 self.tickers_list = self.logger.update_ticker(symbol, 'active', True, lock=True, log=True)
-        
-    #     if self.live_mode:
-    #         # Deactivate tickers not in scanner results anymore
-    #         self.tickers_list = self.logger.load_tickers_list(lock=True)
-    #         active_symbols = [symbol for symbol in self.tickers_list if self.tickers_list[symbol]['active']]
-    #         for symbol in active_symbols:
-    #             if symbol not in symbols_scanner and symbol not in self.symbols_seed:
-    #                 self.tickers_list = self.logger.update_ticker(symbol, 'active', False, lock=True, log=True)
+    def _build_args_worker(self, wtype, initialize:bool=True):
+            # Case white worker
+            if wtype in self.workers_list['white']:
+                return (self.workers_params[wtype]['wait_seconds'], self.config.live_mode, self.workers_params[wtype]['ib_client_id'],self.config.paper_trading,
+                    self.config.remote_ib)
 
-    # def orchestrate_queues(self):
-    #     print("🧠 Orchestration dispatcher started.")
+            # Case blue worker
+            elif wtype in self.workers_list['blue']:
+                return (wtype, self.workers_params[wtype]['wait_seconds'], self.look_backward, self.config.live_mode, self.config.paper_trading,
+                    self.config.remote_ib, initialize)
+            return ()
 
-    #     while True:
-    #         now = helpers.calculate_now(self.config.sim_offset, self.tmanager.tz)
-    #         print(f"\n⏱️ Current Time: {now}")
-    #         symbols_scanner = self.tmanager.get_scanner_data(now, use_daily_data=self.live_mode=='sim')
-    #         print(f"📡 Fetched symbols from scanner:\n{symbols_scanner}")
+    def _build_processes_params(self):
+        proc_args = {}
+        for worker_type in self.workers_list['white'] + self.workers_list['blue']:
+            proc_args[worker_type] = {'args': self._build_args_worker(worker_type), 'pname': self.workers_params[worker_type]['pname']}
+        return proc_args
 
-    #         # symbols_scanner = ['CPB']#, 'SHFS', 'UUUU']
+    def _run_web_server(self):
+        # Run the web server in a separate thread
+        web_thread = threading.Thread(target=self.webserver.start_web_server)
+        web_thread.daemon = True  # This will allow the thread to exit when the main program exits
+        web_thread.start()
 
-    #         self._organize_tickers_list(symbols_scanner)
+    def run_scans_fetcher(self):
+        print("⚡ Starting live scans fetcher...")
+        self.pmanager.launch_process(target=process_manager.run_live_scans_fetcher, wtype='scans')
 
-    #         self.tickers_list = self.logger.load_tickers_list(lock=True)
-    #         for symbol, info in list(self.tickers_list.items()):
-    #             if not info['active']:
-    #                 continue
-                
-    #             condition_handling = not (self.tickers_list[symbol]['fetching'] or self.tickers_list[symbol]['enriching'])
-    #             # --- Initialization Phase ---
-    #             if not self.tickers_list[symbol]['initialized']:
-    #                 if condition_handling and not self.tickers_list[symbol]['last_fetched']:
-    #                     self.logger.put_queue(symbol, 'fetch', lock=True)
-    #                     continue
-    #                 if self.tickers_list[symbol]['last_fetched'] and condition_handling and not self.tickers_list[symbol]['last_enriched']:
-    #                     self.logger.put_queue(symbol, 'enrich', lock=True)
-    #                     continue
+    def run_L2_fetcher(self):
+        print("⚡ Starting live L2 fetcher...")
+        self.pmanager.launch_process(target=process_manager.run_live_L2_fetcher, wtype='L2')
 
-    #                 if self.tickers_list[symbol]['last_fetched'] and self.tickers_list[symbol]['last_enriched']:
-    #                     self.logger.update_ticker(symbol, 'initialized', True)
-    #                     self.tickers_list = self.logger.update_ticker(symbol, 'priority', 1, lock=True, log=True)
-    #                     # self._update_ticker(symbol, 'status', 'ready')
-    #                     # self._update_ticker(symbol, 'last_updated', now)
-    #                     continue
+    def run_queue_manager(self):
+        print("⚡ Starting live queue manager...")
+        self.pmanager.launch_process(target=process_manager.run_live_queue_manager, wtype='queue')
 
-    #             # --- Recurrent Phase ---
-    #             if self.tickers_list[symbol]['initialized']:
-    #                 # time_since_update = (now - self.tickers_list[symbol]['last_updated']).total_seconds() if self.tickers_list[symbol]['last_updated'] else float('inf')
-    #                 time_since_fetched = (now - pd.to_datetime(self.tickers_list[symbol]['last_fetched'])).total_seconds() if self.tickers_list[symbol]['last_fetched'] else float('inf')
-    #                 time_since_enriched = (now - pd.to_datetime(self.tickers_list[symbol]['last_enriched'])).total_seconds() if self.tickers_list[symbol]['last_enriched'] else float('inf')
-    #                 time_since_executed = (now - pd.to_datetime(self.tickers_list[symbol]['last_executed'])).total_seconds() if self.tickers_list[symbol]['last_executed'] else float('inf')
+    def run_data_worker(self, wtype:str):
+        print(f"⚡ Starting live data {wtype}er...")
+        self.pmanager.launch_process(process_manager.run_live_worker, wtype=wtype)
 
-    #                 # p = self.tickers_list[symbol].get("priority", 2) if symbol in self.tickers_list else 2
-    #                 # if p > 0:
-    #                 #     print()
-
-    #                 if condition_handling and time_since_fetched > self.scan_rate:
-    #                     self.logger.put_queue(symbol, 'fetch', lock=True)
-    #                     continue
-
-    #                 if condition_handling and time_since_enriched > self.scan_rate and time_since_fetched < self.scan_rate:
-    #                     self.logger.put_queue(symbol, 'enrich', lock=True)
-    #                     continue
-
-    #                 if condition_handling and time_since_executed > self.scan_rate and time_since_enriched < self.scan_rate and time_since_fetched < self.scan_rate:
-    #                     self.logger.put_queue(symbol, 'execut', lock=True)
-    #                     continue
-
-    #         helpers.sleep_display(self.proc_params['orchestrator']['wait_seconds'], self.ib)
-
-    def _launch_process(self, target, args=(), log_path:str=None, pname:str=None):
-        processes, pids = [], []
-        if self.new_terminal:
-            command = process_launcher.get_terminal_command(target, args)
-            if command:
-                print(f"▶️ Starting process {pname}...")
-                process = subprocess.Popen(command, shell=True)
-                ib.sleep(5 * CONSTANTS.PROCESS_TIME['long'])
-                processes = helpers.get_process_by('cmdline', pname)
-                pids = [proc['pid'] for proc in processes if isinstance(proc['cmdline'], list)]
-            else:
-                print("❌ Could not determine terminal command for your OS.")
-        else:
-            # Add timestamp to log path if provided
-            if log_path:
-                ts = datetime.now(self.tmanager.tz).strftime("%Y%m%d_%H%M%S_%z")
-                base, ext = os.path.splitext(log_path)
-                log_path = f"{base}_{ts}{ext}"
-                os.makedirs(os.path.dirname(log_path), exist_ok=True)
-            else:
-                log_path = os.devnull  # silence output if no log specified
-
-            # Start a wrapper process that sets up logging
-            p = multiprocessing.Process(target=process_launcher.run_with_logging, args=(target, args, log_path))
-            p.start()
-            processes.append(p)
-            pids.append(p.pid)
-
-            if self.tail_log and log_path != os.devnull:
-                process_launcher.tail_log_in_new_terminal(log_path)
-                ib.sleep(5 * CONSTANTS.PROCESS_TIME['long'])
-                processes_log = helpers.get_process_by('cmdline', pname)
-                pids.extend([proc['pid'] for proc in processes_log if isinstance(proc['cmdline'], list)])
-                processes.extend(processes_log)
-            
-        self.processes.append({'name': pname, 'pids': pids, 'processes': processes})
-    
-    def get_process_ids(self):
-        """Retrieve the PIDs of all running processes."""
-        return [p.pid for p in self.processes]
-
-    def check_process_alive(self, pid:int):
-        """Check if a process with a given PID is still running."""
-        # Check the process status using the poll method of the Popen object
-        for p in self.processes:
-            if p.pid == pid:
-                return p.poll() is None  # If the process hasn't terminated, poll() will return None
-        return False
-    
     def orchestrate_processes(self):
+        print("🌐 Starting web server...")
+        self._run_web_server()
 
-        print("⚡ Starting live processes.")
+        # Start workers
+        self.run_scans_fetcher()
+        self.run_L2_fetcher()
+        self.run_queue_manager()
+        # self.run_data_worker(wtype='fetch')
+        # self.run_data_worker(wtype='enrich')
+        # self.run_data_worker(wtype='execut')
 
-        # Start scans fetcher
-        args_scans = (self.proc_params['scans']['wait_seconds'], self.config.live_mode, self.proc_params['scans']['ib_client_id'], 
-                      self.config.paper_trading, self.config.remote_ib)
-        self._launch_process(process_launcher.run_live_scans_fetcher, args=args_scans, log_path=self.proc_params['scans']['log_path'], pname='scans_fetcher')
-        
-        # Start L2 fecther
-        args_L2 = (self.proc_params['L2']['wait_seconds'], self.config.live_mode, self.proc_params['L2']['ib_client_id'], 
-                      self.config.paper_trading, self.config.remote_ib)
-        self._launch_process(process_launcher.run_live_L2_fetcher, args=args_L2, log_path=self.proc_params['L2']['log_path'], pname='L2_fetcher')
 
-        args_worker = (self.tmanager.strategy_name, self.config.stop, self.config.revised, self.config.step_duration, self.config.live_mode, 
-                             self.config.sim_offset.total_seconds(), self.config.paper_trading, self.proc_params['fetch']['wait_seconds'])
-        args_data_fetcher = ('fetch',) + args_worker
+        # args_worker = (self.tmanager.strategy_name, self.config.stop, self.config.revised, self.config.step_duration, self.config.live_mode,
+        #                      self.config.sim_offset.total_seconds(), self.config.paper_trading, self.proc_params['fetch']['wait_seconds'])
+        # args_data_fetcher = ('fetch',) + args_worker
 
-        # Start data fetcher        
-        # self._launch_process(process_launcher.run_live_worker, args=args_data_fetcher, new_terminal=True, 
+        # Start data fetcher
+        # self._launch_process(process_launcher.run_live_worker, wtype='fetch')
+
+        # Start data enricher
+        # self._launch_process(process_launcher.run_live_worker, wtype='enrich')
+
+        # Start data enricher
+        # self._launch_process(process_launcher.run_live_worker, wtype='execut')
+
+        count = 0
+
+        while True:
+            self.ib.sleep(5)
+            # pdict = {'name': f"process_{count}", 'pids': count, 'status': 'running'}
+            # print(pdict)
+            # self.processes.append(pdict)
+            # count += 1
+            # print()
+            pass
+
+
+        # Start data fetcher
+        # self._launch_process(process_launcher.run_live_worker, args=args_data_fetcher, new_terminal=True,
         #                      log_path=self.proc_params['fetch']['log_path'], tail_logs=True)
-        
+
         # # Start data enricher
-        # self._launch_process(process_launcher.run_live_worker, args=('enrich',) + args_worker, new_terminal=True, 
+        # self._launch_process(process_launcher.run_live_worker, args=('enrich',) + args_worker, new_terminal=True,
         #                      log_path=self.proc_params['fetch']['log_path'], tail_logs=True)
-        
+
         # # Start init data fetcher
-        # args_trade_manager_json = json.dumps({'strategy_name': self.tmanager.strategy_name, 'stop': self.tmanager.stop, 'target': self.tmanager.target, 
-        #                       'revised': self.tmanager.revised, 'timeframe': self.tmanager.timeframe, 'look_backward': self.tmanager.look_backward, 
+        # args_trade_manager_json = json.dumps({'strategy_name': self.tmanager.strategy_name, 'stop': self.tmanager.stop, 'target': self.tmanager.target,
+        #                       'revised': self.tmanager.revised, 'timeframe': self.tmanager.timeframe, 'look_backward': self.tmanager.look_backward,
         #                       'step_duration': self.tmanager.step_duration})
-        
+
         # args_logger_json = json.dumps({'mode': self.logger.mode, 'sim_offset': self.logger.sim_offset.total_seconds()})
-        
+
         # args_data_fetcher = (self.paper_trading, self.proc_params['fetch']['wait_seconds'], args_trade_manager_json, args_logger_json, self.tickers_list, self.tmanager.tz)
-        # self._launch_process(process_launcher.run_live_data_fetcher, args=args_data_fetcher, new_terminal=True, 
+        # self._launch_process(process_launcher.run_live_data_fetcher, args=args_data_fetcher, new_terminal=True,
         #                      log_path=self.proc_params['fetch']['log_path'], tail_logs=True)
 
         # # Start init data enricher
         # args_data_enricher = (self.paper_trading, self.proc_params['enrich']['wait_seconds'], args_trade_manager_json, args_logger_json, self.tickers_list, self.tmanager.tz)
-        # self._launch_process(process_launcher.run_live_data_enricher, args=args_data_enricher, new_terminal=True, 
+        # self._launch_process(process_launcher.run_live_data_enricher, args=args_data_enricher, new_terminal=True,
         #                      log_path=self.proc_params['enrich']['log_path'], tail_logs=True)
 
         # # Start continuous data fetchers
         # for _ in range(self.max_fetchers - 1):
-        #     self._launch_process(process_launcher.run_live_data_fetcher, args=args_data_fetcher + (True,), new_terminal=False, 
+        #     self._launch_process(process_launcher.run_live_data_fetcher, args=args_data_fetcher + (True,), new_terminal=False,
         #                          log_path=self.proc_params['fetch']['log_path'], tail_logs=True)
         #     # self._launch_process(process_launcher.run_live_data_fetcher, args=(self.shared_tickers, self.fetch_queue, self.enrich_queue))
 
         # # Start continuous data enrichers
         # for _ in range(self.max_enrichers - 1):
-        #     self._launch_process(process_launcher.run_live_data_enricher, args=args_data_enricher + (True,), new_terminal=False, 
+        #     self._launch_process(process_launcher.run_live_data_enricher, args=args_data_enricher + (True,), new_terminal=False,
         #                          log_path=self.proc_params['enrich']['log_path'], tail_logs=True)
 
         # self.orchestrate()
@@ -290,7 +210,7 @@ class LiveOrchestrator:
 
         #         if not self.logger.last_scanner_check or (now - self.logger.last_scanner_check > self.scanner_interval):
         #             print("📡 Updating symbols from scanner...")
-                    
+
 
 
         # except KeyboardInterrupt:
@@ -313,9 +233,9 @@ if __name__ == "__main__":
     strategy_name = next((arg[9:] for arg in args if arg.startswith('strategy=')), None)
     mode = next((arg[5:] for arg in args if arg.startswith('mode=')), 'live')
 
-    ib, _ = helpers.IBKRConnect_any(IB(), paper=paper_trading, remote=remote_ib)
+    # ib, _ = helpers.IBKRConnect_any(IB(), paper=paper_trading, remote=remote_ib)
 
-    orchestrator = LiveOrchestrator(ib, seed=seed, strategy_name=strategy_name, revised=revised, live_mode=mode, paper_trading=paper_trading, remote_ib=remote_ib, 
+    orchestrator = LiveOrchestrator(seed=seed, strategy_name=strategy_name, revised=revised, live_mode=mode, paper_trading=paper_trading, remote_ib=remote_ib,
                                     new_terminal=new_terminal, tail_log=tail_log)
     orchestrator.orchestrate_processes()
 
@@ -341,7 +261,7 @@ if __name__ == "__main__":
     #     args = (symbol, self.look_backward, self.step_duration, self.paper_trading, 0, False, init)
     #     self._launch_process(process_launcher.run_live_data_fetcher, args=args, new_terminal=False, tail_logs=False)
 
-        
+
 
     # def _assign_enrich(self, symbol, init: bool):
     #     self._update_ticker(symbol, 'enriching', True)
@@ -389,7 +309,7 @@ if __name__ == "__main__":
 #         # self._create_paths()
 #         # self.symbols_list = helpers.load_json(self.log_file_path)['symbols_list'] if os.path.exists(self.log_file_path) else {}
 #         # self.last_scanner_check = pd.to_datetime(helpers.load_json(self.logger.log_file_path)['last_scanner_check']) if os.path.exists(self.logger.log_file_path) else None
-    
+
 #     def _assess_add_sr(self, symbol: str, trig_time: datetime) -> bool:
 #         # Get the min refresh_rate from settings
 #         min_refresh_str = min(CONSTANTS.SR_SETTINGS, key=lambda setting: helpers.get_ibkr_duration_as_timedelta(setting['refresh_rate']))['refresh_rate']
@@ -413,7 +333,7 @@ if __name__ == "__main__":
 #             # Already in a new minute → skip wait
 #             print(f"⚡ New minute {current_minute.strftime('%H:%M')} already started. Skipping wait.")
 #             return
-        
+
 #         current_second = now.second
 #         remaining = 60 - current_second
 
@@ -436,29 +356,29 @@ if __name__ == "__main__":
 #             ####################################
 
 #             block_add_sr = self._assess_add_sr(symbol, trig_time)
-            
+
 #             df = self.tmanager.load_data_live(symbol, trig_time=trig_time, look_backward='1 M', block_add_sr=block_add_sr)
 #             # loop = asyncio.get_event_loop()
 #             # df = await loop.run_in_executor(self.executor, self.tmanager.load_data_live, symbol, trig_time, None, '1M', 'parquet', block_add_sr)
-            
+
 #             if df.empty:
 #                 return None
 
 #             self.logger.update_symbols_list(symbol, 'last_trig', trig_time)
-            
+
 #             df = self.tmanager.apply_model_predictions(df)
 #             # df = await loop.run_in_executor(self.executor, self.tmanager.apply_model_predictions, df)
-            
+
 #             latest_row = df.iloc[-1]
 
 #             if self.tmanager.evaluate_entry_conditions(latest_row):
 #                 return (symbol, latest_row)
-            
+
 #             # In case symbol doesn't meet trigger conditions, remove from active symbols
 #             is_triggered = self.tmanager.strategy_instance.evaluate_trigger(latest_row)
 #             # if not is_triggered:
 #             #     self._update_symbols_list(symbol, 'active', False)
-                
+
 
 #             return None
 #         except Exception as e:
@@ -524,7 +444,7 @@ if __name__ == "__main__":
 #                         # self.symbols_list[scanned_symbol] = {'active': True, 'last_trig': None}
 #                         self.logger.update_symbols_list(scanned_symbol, 'active', True)
 #                         self.logger.update_symbols_list(scanned_symbol, 'last_trig', None)
-                        
+
 #                 self.logger.last_scanner_check = now
 #                 self.logger.update_log()
 #                 print(f"✅ {len(self.logger.symbols_list)} symbols loaded.")
@@ -687,7 +607,7 @@ if __name__ == "__main__":
 #         # self._create_paths()
 #         # self.symbols_list = helpers.load_json(self.log_file_path)['symbols_list'] if os.path.exists(self.log_file_path) else {}
 #         # self.last_scanner_check = pd.to_datetime(helpers.load_json(self.logger.log_file_path)['last_scanner_check']) if os.path.exists(self.logger.log_file_path) else None
-    
+
 #     def _assess_add_sr(self, symbol: str, trig_time: datetime) -> bool:
 #         # Get the min refresh_rate from settings
 #         min_refresh_str = min(CONSTANTS.SR_SETTINGS, key=lambda setting: helpers.get_ibkr_duration_as_timedelta(setting['refresh_rate']))['refresh_rate']
@@ -711,7 +631,7 @@ if __name__ == "__main__":
 #             # Already in a new minute → skip wait
 #             print(f"⚡ New minute {current_minute.strftime('%H:%M')} already started. Skipping wait.")
 #             return
-        
+
 #         current_second = now.second
 #         remaining = 60 - current_second
 
@@ -734,29 +654,29 @@ if __name__ == "__main__":
 #             ####################################
 
 #             block_add_sr = self._assess_add_sr(symbol, trig_time)
-            
+
 #             df = self.tmanager.load_data_live(symbol, trig_time=trig_time, look_backward='1 M', block_add_sr=block_add_sr)
 #             # loop = asyncio.get_event_loop()
 #             # df = await loop.run_in_executor(self.executor, self.tmanager.load_data_live, symbol, trig_time, None, '1M', 'parquet', block_add_sr)
-            
+
 #             if df.empty:
 #                 return None
 
 #             self.logger.update_symbols_list(symbol, 'last_trig', trig_time)
-            
+
 #             df = self.tmanager.apply_model_predictions(df)
 #             # df = await loop.run_in_executor(self.executor, self.tmanager.apply_model_predictions, df)
-            
+
 #             latest_row = df.iloc[-1]
 
 #             if self.tmanager.evaluate_entry_conditions(latest_row):
 #                 return (symbol, latest_row)
-            
+
 #             # In case symbol doesn't meet trigger conditions, remove from active symbols
 #             is_triggered = self.tmanager.strategy_instance.evaluate_trigger(latest_row)
 #             # if not is_triggered:
 #             #     self._update_symbols_list(symbol, 'active', False)
-                
+
 
 #             return None
 #         except Exception as e:
@@ -822,7 +742,7 @@ if __name__ == "__main__":
 #                         # self.symbols_list[scanned_symbol] = {'active': True, 'last_trig': None}
 #                         self.logger.update_symbols_list(scanned_symbol, 'active', True)
 #                         self.logger.update_symbols_list(scanned_symbol, 'last_trig', None)
-                        
+
 #                 self.logger.last_scanner_check = now
 #                 self.logger.update_log()
 #                 print(f"✅ {len(self.logger.symbols_list)} symbols loaded.")
@@ -1001,7 +921,7 @@ if __name__ == "__main__":
     #     print(f"❌ Exited position")
 
     # def determine_quantity(self, prediction):
-    #     return backtest_utils.BacktestManager.evaluate_quantity(prediction, self.config.size, 
+    #     return backtest_utils.BacktestManager.evaluate_quantity(prediction, self.config.size,
     #                                              self.config.prediction_threshold,
     #                                              self.config.tier_max)
 

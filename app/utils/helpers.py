@@ -80,7 +80,7 @@ def IBKRConnect(ib:IB=IB(), paper:bool=True, client_id:int=None, remote:bool=Tru
     port_number = CONSTANTS.IB_PORT_PAPER if paper else CONSTANTS.IB_PORT_LIVE
     # clientId = 1 if not client_id else client_id
 
-    client_ids = [client_id] if client_id else range(1, CONSTANTS.IB_MAX_CLIENTS + 1)
+    client_ids = [client_id] if client_id is not None else range(0, CONSTANTS.IB_MAX_CLIENTS + 1)
     print("--------------------------------")
     print(f"ib_ip = {ib_ip}")
     print(f"port_number = {port_number}")
@@ -166,55 +166,6 @@ def get_stock_currency_yf(symbol:str):
     except Exception as e:
         print(f"Could not fetch currency from Yahoo Finance. Error: {e}" + "  |  Full error: ", traceback.format_exc())
         return CONSTANTS.DEFAULT_CURRENCY
-
-
-def get_process_by(attr:str, value:str):
-    attr_list = ['cmdline', 'pid', 'name', 'status', 'create_time']
-    # 'exe', 'cpu_times', 'cpu_percent', 'memory_percent', 'memory_info', 'io_counters', 'num_threads', 'threads', 'open_files', 'environ', 'nice', 'cpu_affinity'
-    if not value:
-        print(f"⚠️ Value for 'value' is needed")
-        return[]
-    if not attr or attr not in attr_list:
-        print(f"⚠️ 'attr' must be within {attr_list}")
-        return[]
-    
-    pall = psutil.process_iter(attr_list)
-    matched_processes = []
-    
-    for proc in pall:
-        proc_info = proc.info.get(attr, None)
-        if not proc_info:
-            continue
-
-        condition_num = isinstance(proc_info, (int, float)) and proc_info == value
-        condition_str = isinstance(proc_info, str) and value in proc_info
-        condition_list = isinstance(proc_info, list) and all(isinstance(p, str) for p in proc_info) and any([value in p for p in proc_info])
-        if condition_num or condition_str or condition_list:
-            matched_processes.append({**proc.info, 
-                                        'create_time': datetime.fromtimestamp(proc.info['create_time']).strftime('%Y-%m-%d %H:%M:%S') 
-                                        if 'create_time' in proc.info else None})
-    return matched_processes
-    # matched_processes = [{
-    #     **proc.info, # Copy all info of the process
-    #     'create_time': datetime.fromtimestamp(proc.info['create_time']).strftime('%Y-%m-%d %H:%M:%S') if 'create_time' in proc.info else None}
-    #     for proc in pall if proc.info.get(attr, '') and \
-    #         (any([value in p for p in proc.info.get(attr, '')]) \
-    #          if not isinstance(proc.info.get(attr, ''), (int, float)) else proc.info.get(attr, '') == value)  # Filter based on the value in the specified attribute
-    #     ]
-    # return matched_processes
-
-
-def list_all_processes():
-    """List all running processes with PID, name, and status."""
-    processes = []
-    for proc in psutil.process_iter(['pid', 'name', 'status', 'username', 'cmdline']):
-        try:
-            processes.append(proc.info)
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            # Ignore processes that no longer exist or can't be accessed
-            continue
-    return processes
-
 
 
 
@@ -1284,7 +1235,7 @@ def trim_df(df:pd.DataFrame, from_time:datetime=None, to_time:datetime=None, kee
     if from_time > to_time:
         print(f"⚠️ to_time < from_time, returning empty.")
         return pd.DataFrame()
-    
+
     df = format_df_date(df)
     df_to_time = pd.to_datetime(df['date'].iloc[-1]) if not df.empty else None
     df_from_time = pd.to_datetime(df['date'].iloc[0]) if not df.empty else None

@@ -9,18 +9,18 @@ import live_loop_base
 
 
 class LiveQueueManager(live_loop_base.LiveLoopBase):
-    def __init__(self, wait_seconds:int=None, continuous:bool=True, single_symbol=None, tickers_list:dict={}, config=None, live_mode:str=None, 
-                 seed:int=None, paper_trading:bool=None, remote_ib:bool=None, timezone=None):
-            
-        super().__init__(wait_seconds=wait_seconds, continuous=continuous, single_symbol=single_symbol, ib_disconnect=False, 
-                         live_mode=live_mode, config=config, seed=seed, paper_trading=paper_trading, remote_ib=remote_ib, timezone=timezone)
+    def __init__(self, wait_seconds:int=None, continuous:bool=True, single_symbol=None, tickers_list:dict={}, config=None, live_mode:str=None,
+                 ib_client_id:int=None, seed:int=None, paper_trading:bool=None, remote_ib:bool=None, timezone=None):
+
+        super().__init__(wait_seconds=wait_seconds, continuous=continuous, single_symbol=single_symbol, ib_disconnect=False,
+                         live_mode=live_mode, ib_client_id=ib_client_id, config=config, seed=seed, paper_trading=paper_trading, remote_ib=remote_ib, timezone=timezone)
         self.symbols_seed = helpers.get_symbol_seed_list(self.config.seed)
         self.scan_rate = self.tmanager.strategy_instance.timeframe.to_seconds
         self.tickers_list = tickers_list or self.logger.load_tickers_list(lock=True)
         self.fetch_queue = self.logger.get_queue('fetch', lock=True)
         self.enrich_queue = self.logger.get_queue('enrich', lock=True)
         self.execite_queue = self.logger.get_queue('execut', lock=True)
-    
+
     def _organize_tickers_list(self, symbols_scanner:list):
         # Add new tickers
         for symbol in self.symbols_seed + symbols_scanner:
@@ -31,7 +31,7 @@ class LiveQueueManager(live_loop_base.LiveLoopBase):
             else:
                 if not self.tickers_list[symbol]['active']:
                     self.tickers_list = self.logger.update_ticker(symbol, 'active', True, lock=True, log=True)
-        
+
         if self.live_mode:
             # Deactivate tickers not in scanner results anymore
             self.tickers_list = self.logger.load_tickers_list(lock=True)
@@ -54,7 +54,7 @@ class LiveQueueManager(live_loop_base.LiveLoopBase):
         for symbol, info in list(self.tickers_list.items()):
             if not info['active']:
                 continue
-            
+
             condition_handling = not (self.tickers_list[symbol]['fetching'] or self.tickers_list[symbol]['enriching'])
             # --- Initialization Phase ---
             if not self.tickers_list[symbol]['initialized']:

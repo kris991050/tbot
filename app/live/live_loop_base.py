@@ -1,4 +1,4 @@
-import sys, os, pandas as pd
+import sys, os
 from ib_insync import *
 parent_folder = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_folder)
@@ -10,19 +10,19 @@ import trading_config, live_data_logger
 
 
 class LiveLoopBase:
-    def __init__(self, worker_type:str=None, wait_seconds:int=None, continuous:bool=True, single_symbol:str=None, ib_disconnect:bool=False, 
+    def __init__(self, worker_type:str=None, wait_seconds:int=None, continuous:bool=True, single_symbol:str=None, ib_disconnect:bool=False,
                  live_mode:str='live', ib_client_id:int=None, config=None, seed:int=None, paper_trading:bool=None, remote_ib:bool=None, timezone=None):
         self.worker_type = worker_type
         self.live_mode = helpers.set_var_with_constraints(live_mode, CONSTANTS.MODES['live'])
         self.ib_client_id = ib_client_id
         self.config = self._resolve_config(config, locals())
 
-        print("========================================")
-        print(f"remote_ib = {remote_ib}")
-        print(f"paper_trading = {paper_trading}")
-        print(f"self.config.remote_ib = {self.config.remote_ib}")
-        print(f"self.config.paper_trading = {self.config.paper_trading}")
-        print("========================================")
+        # print("========================================")
+        # print(f"remote_ib = {remote_ib}")
+        # print(f"paper_trading = {paper_trading}")
+        # print(f"self.config.remote_ib = {self.config.remote_ib}")
+        # print(f"self.config.paper_trading = {self.config.paper_trading}")
+        # print("========================================")
         IB.sleep(5)
 
         self.wait_seconds = wait_seconds if wait_seconds else None
@@ -39,22 +39,20 @@ class LiveLoopBase:
     def _resolve_config(self, config, locals_main):
         if isinstance(config, trading_config.TradingConfig):
             return config
-        
+
         config_file_path = live_data_logger.LiveDataLogger(live_mode=self.live_mode).config_file_path
         if os.path.exists(config_file_path):
             return trading_config.TradingConfig(live_mode=self.live_mode).load_config(config_file_path)
-            
+
         return trading_config.TradingConfig(live_mode=self.live_mode).set_config(locals_main)
-    
+
     def _connect_ib(self):
-        print("\n🔌 Connecting IB")
-        print("-------------------------------------------")
-        print(f"remote_ib = {self.config.remote_ib}")
-        print("-------------------------------------------")
-        self.ib, _ = helpers.IBKRConnect_any(self.ib, paper=self.config.paper_trading, client_id=self.ib_client_id, remote=self.config.remote_ib)
+        if self.ib_client_id >= 0:
+            print("\n🔌 Connecting IB")
+            self.ib, _ = helpers.IBKRConnect_any(self.ib, paper=self.config.paper_trading, client_id=self.ib_client_id, remote=self.config.remote_ib)
 
     def _disconnect_ib(self):
-        if self.ib:
+        if self.ib and self.ib_disconnect:
             print("📴 Disconnecting IB")
             self.ib.disconnect()
 
@@ -70,7 +68,7 @@ class LiveLoopBase:
         This should be overridden by each child class.
         """
         raise NotImplementedError("Subclasses must implement _execute_main_task()")
-    
+
     def run(self):
 
         # current_time = helpers.calculate_now(sim_offset=self.config.sim_offset, tz=self.config.timezone)
@@ -90,7 +88,7 @@ class LiveLoopBase:
                 self._execute_main_task() # Call the subclass-specific method
 
                 if self.continuous:
-                    if self.ib_disconnect: self._disconnect_ib()
+                    self._disconnect_ib()
                     self._sleep_wait()
                 else:
                     break

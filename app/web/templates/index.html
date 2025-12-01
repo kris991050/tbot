@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="5">  <!-- Auto-refresh every 5 seconds -->
+    <title>Live Orchestrator Dashboard</title>
+</head>
+<body>
+    <h1>Running Processes</h1>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Process Name</th>
+                <th>Process IDs</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for process in processes %}
+            <tr>
+                <td>{{ process.name }}</td>
+                <td>{{ process.pids }}</td>
+                <td>{{ process.status }}</td>
+                <td>
+                    {% if process.status | selectattr('status', 'equalto', 'running') | list | length == process.status | length %}
+                    <a href="{{ url_for('restart', process_name=process.name) }}">Restart</a>
+                    {% else %}
+                    <span>Not running</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
