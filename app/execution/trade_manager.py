@@ -204,7 +204,7 @@ class TradeManager:
         threshold = threshold or self.config.pred_th
         return prediction >= threshold if threshold else True
 
-    def _evaluate_RRR(self, row:pd.Series, stop_price:float):
+    def evaluate_RRR(self, row:pd.Series, stop_price:float):
         # Get target from strategy, depending on target type
         if hasattr(self.strategy_instance.target_handler, 'set_target_price'):
             self.strategy_instance.target_handler.set_target_price(row)
@@ -306,7 +306,7 @@ class TradeManager:
         #     print(row['date'])
         #     print()
         #     print()
-        is_RRR, rrr = self._evaluate_RRR(row, stop_price)
+        is_RRR, rrr = self.evaluate_RRR(row, stop_price)
         if display_triggers and is_triggered:
             trigger_cols = [col for col in self.strategy_instance.required_columns if not any(keyword in col for keyword in ['open', 'high', 'low', 'volume'])]
             print(f"\nEntry conditions triggered at {row['date']}")#.\nTriggers: {row[trigger_cols]}")

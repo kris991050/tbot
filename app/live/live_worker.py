@@ -14,11 +14,11 @@ from execution import trade_executor, orders
 
 class LiveWorker(live_loop_base.LiveLoopBase):
     def __init__(self, action:str, wait_seconds:int=None, continuous:bool=True, single_symbol=None, initialize:bool=True, 
-                 tickers_list:dict={}, base_folder:str=None, config=None, look_backward:str=None, live_mode:str=None, paper_trading:bool=None, 
+                 tickers_list:dict={}, base_folder:str=None, look_backward:str=None, config=None, strategy_name:str=None, live_mode:str=None, paper_trading:bool=None, 
                  remote_ib:bool=None, timezone=None):
             
             super().__init__(worker_type=f"{action}er", wait_seconds=wait_seconds, continuous=continuous, single_symbol=single_symbol, ib_disconnect=False, 
-                             live_mode=live_mode, config=config, paper_trading=paper_trading, remote_ib=remote_ib, timezone=timezone)
+                             live_mode=live_mode, config=config, strategy_name=strategy_name, paper_trading=paper_trading, remote_ib=remote_ib, timezone=timezone)
             
             self.action = helpers.set_var_with_constraints(action, CONSTANTS.LIVE_ACTIONS)
             self.base_folder = base_folder or PATHS.folders_path['live_data']
@@ -77,12 +77,19 @@ class LiveWorker(live_loop_base.LiveLoopBase):
 
         if is_triggered:
             self.tickers_list = self.logger.update_ticker(symbol, 'priority', 3, lock=True, log=True)
-        # print("last_row = ", last_row)
-        print(f"Assessing {symbol} for entry:")
-        # print(f"Prediction: {last_row['model_prediction']}")
-        print(f"is_triggered: {is_triggered}")
-        print(f"is_predicted: {is_predicted}  ({last_row['model_prediction']})")
-        print(f"is_RRR: {is_RRR}")
+        
+        df_entry = pd.DataFrame({
+            'Triggered': [is_triggered, ''], 
+            'Predicted': [is_predicted, last_row['model_prediction'].round(3)], 
+            'RRR': [is_RRR, self.tmanager.evaluate_RRR(row=last_row, stop_price=stop_price)[1]]
+            })
+        print(helpers.df_to_table(df_entry, title=f"Assessing {symbol} for entry"), "\n")
+
+        # print(f"Assessing {symbol} for entry:")
+        # print(f"is_triggered: {is_triggered}")
+        # print(f"is_predicted: {is_predicted}  ({last_row['model_prediction']})")
+        # print(f"is_RRR: {is_RRR}")
+
         # return True, last_row
         return is_triggered and is_predicted and is_RRR, last_row
     
@@ -217,7 +224,7 @@ if __name__ == "__main__":
     continuous = not 'snapshot' in args
     no_initialize = 'noinit' in args
     wait_seconds = next((int(float(arg[5:])) for arg in args if arg.startswith('wait=')), 2)
-    # strategy_name = next((arg[9:] for arg in args if arg.startswith('strategy=')), None)
+    strategy_name = next((arg[9:] for arg in args if arg.startswith('strategy=')), None)
     action = next((arg[7:] for arg in args if arg.startswith('action=')), '')
     mode = next((arg[5:] for arg in args if arg.startswith('mode=')), 'live')
 
@@ -234,7 +241,7 @@ if __name__ == "__main__":
 
     # trade_manager = trade_manager.TradeManager(IB(), strategy_name, stop, revised=revised)
 
-    worker = LiveWorker(action=action, live_mode=mode, initialize=not no_initialize, 
+    worker = LiveWorker(action=action, live_mode=mode, initialize=not no_initialize, strategy_name=strategy_name, 
                               paper_trading=paper_trading, wait_seconds=wait_seconds, continuous=continuous, remote_ib=remote_ib)
     worker.run()
 

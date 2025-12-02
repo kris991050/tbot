@@ -17,7 +17,7 @@ class BacktestOrchestrator:
     def __init__(self, ib:IB, strategy_name:str, stop=None, revised:bool=False, symbols:list=None, seed:int=None, timeframe=Timeframe(),
                  config=None, engine_type:str='custom', selector_type:str='rf', mode:str='backtest', timezone=None,
                  look_backward:str=None, step_duration:str=None):
-        self.tmanager = trade_manager.TradeManager(ib, config, strategy_name, stop, revised=revised, look_backward=look_backward, step_duration=step_duration,
+        self.tmanager = trade_manager.TradeManager(ib, config, strategy_name, stop, revised=revised, step_duration=step_duration,
                                                   selector_type=selector_type, timezone=timezone)
         self.strategy_required_columns = self.tmanager.get_strategy_required_columns()
         self.look_backward = look_backward or CONSTANTS.WARMUP_MAP[self.tmanager.strategy_instance.timeframe.pandas]
@@ -95,7 +95,7 @@ class BacktestOrchestrator:
         if self.engine_type == 'custom':
             return custom_backtester.CustomBacktestEngine(df, symbol, self.tmanager)
         elif self.engine_type == 'backtrader':
-            return backtrader_backtester.BacktraderBacktestEngine(df=df, symbol=symbol, manager=self.tmanager)
+            return backtrader_backtester.BacktraderBacktestEngine(df=df, symbol=symbol, tmanager=self.tmanager)
         else:
             raise ValueError(f"Unknown engine type: {self.engine_type}")
 

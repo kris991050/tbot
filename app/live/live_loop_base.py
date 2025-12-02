@@ -11,8 +11,9 @@ import trading_config, live_data_logger
 
 class LiveLoopBase:
     def __init__(self, worker_type:str=None, wait_seconds:int=None, continuous:bool=True, single_symbol:str=None, ib_disconnect:bool=False,
-                 live_mode:str='live', ib_client_id:int=None, config=None, seed:int=None, paper_trading:bool=None, remote_ib:bool=None, timezone=None):
+                 live_mode:str='live', ib_client_id:int=None, config=None, strategy_name:str=None, seed:int=None, paper_trading:bool=None, remote_ib:bool=None, timezone=None):
         self.worker_type = worker_type
+        self.strategy_name = strategy_name
         self.live_mode = helpers.set_var_with_constraints(live_mode, CONSTANTS.MODES['live'])
         self.ib_client_id = ib_client_id
         self.config = self._resolve_config(config, locals())
@@ -23,7 +24,7 @@ class LiveLoopBase:
         # print(f"self.config.remote_ib = {self.config.remote_ib}")
         # print(f"self.config.paper_trading = {self.config.paper_trading}")
         # print("========================================")
-        IB.sleep(5)
+        # IB.sleep(5)
 
         self.wait_seconds = wait_seconds if wait_seconds else None
         self.continuous = continuous
@@ -40,14 +41,14 @@ class LiveLoopBase:
         if isinstance(config, trading_config.TradingConfig):
             return config
 
-        config_file_path = live_data_logger.LiveDataLogger(live_mode=self.live_mode).config_file_path
+        config_file_path = live_data_logger.LiveDataLogger(strategy_name=self.strategy_name, live_mode=self.live_mode).config_file_path
         if os.path.exists(config_file_path):
             return trading_config.TradingConfig(live_mode=self.live_mode).load_config(config_file_path)
 
         return trading_config.TradingConfig(live_mode=self.live_mode).set_config(locals_main)
 
     def _connect_ib(self):
-        if self.ib_client_id >= 0:
+        if not self.ib_client_id or self.ib_client_id >= 0:
             print("\n🔌 Connecting IB")
             self.ib, _ = helpers.IBKRConnect_any(self.ib, paper=self.config.paper_trading, client_id=self.ib_client_id, remote=self.config.remote_ib)
 

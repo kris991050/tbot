@@ -1,4 +1,4 @@
-import os, sys, pandas as pd, ta, numpy as np, traceback, tqdm
+import os, sys, pandas as pd, ta, numpy as np, traceback, tqdm, arch
 from datetime import timedelta
 from ib_insync import *
 

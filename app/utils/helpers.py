@@ -78,15 +78,8 @@ def IBKRConnect_any(ib:IB=IB(), paper:bool=True, client_id:int=None, remote:bool
 def IBKRConnect(ib:IB=IB(), paper:bool=True, client_id:int=None, remote:bool=True):
     ib_ip = CONSTANTS.IB_IP_REMOTE if remote else CONSTANTS.IB_IP_LOCAL
     port_number = CONSTANTS.IB_PORT_PAPER if paper else CONSTANTS.IB_PORT_LIVE
-    # clientId = 1 if not client_id else client_id
 
     client_ids = [client_id] if client_id is not None else range(0, CONSTANTS.IB_MAX_CLIENTS + 1)
-    print("--------------------------------")
-    print(f"ib_ip = {ib_ip}")
-    print(f"port_number = {port_number}")
-    print(f"client_ids = {client_ids}")
-    print(f"paper = {paper}")
-    print("--------------------------------")
     try:
         for clientId in client_ids:
             if ib.isConnected():
@@ -174,7 +167,7 @@ def get_stock_currency_yf(symbol:str):
 # ======================
 
 
-def get_path_date_folder(date=None, create_if_none=True, local=False):
+def get_path_date_folder(date:datetime=None, create_if_none:bool=True, local:bool=False):
 
     date = date or datetime.now(CONSTANTS.TZ_WORK)
     if isinstance(date, str):
@@ -193,31 +186,30 @@ def get_path_date_folder(date=None, create_if_none=True, local=False):
     return date_folder_path
 
 
-def get_path_daily_data_folder(date=None, create_if_none=True, local=False):
+def get_path_daily_folder(folder_name:str, date:datetime=None, create_if_none:bool=True, local:bool=False):
 
     date = date or datetime.now(CONSTANTS.TZ_WORK)
     if not local: root_folder_path = get_path_date_folder(date, create_if_none, local)
     else: root_folder_path = os.getcwd()
-    daily_data_folder_path = os.path.join(root_folder_path, 'daily_data')
+    daily_folder_path = os.path.join(root_folder_path, folder_name)
 
-    if not os.path.exists(daily_data_folder_path) and create_if_none:
-        os.mkdir(daily_data_folder_path)
+    if not os.path.exists(daily_folder_path) and create_if_none:
+        os.mkdir(daily_folder_path)
 
-    return daily_data_folder_path
+    return daily_folder_path
 
 
-def get_path_daily_logs_folder(date=None, create_if_none=True, local=False):
+def get_path_daily_data_folder(date:datetime=None, create_if_none:bool=True, local:bool=False):
+    return get_path_daily_folder('daily_data', date, create_if_none, local)
 
-    date = date or datetime.now(CONSTANTS.TZ_WORK)
-    if not local: root_folder_path = get_path_date_folder(date, create_if_none, local)
-    else: root_folder_path = os.getcwd()
-    daily_logs_folder_path = os.path.join(root_folder_path, 'live_logs')
 
-    if not os.path.exists(daily_logs_folder_path) and create_if_none:
-        os.mkdir(daily_logs_folder_path)
+def get_path_daily_logs_folder(date:datetime=None, create_if_none:bool=True, local:bool=False):
+    return get_path_daily_folder('live_logs', date, create_if_none, local)
 
-    return daily_logs_folder_path
 
+def get_path_daily_strategy_folder(strategy_name:str, date:datetime=None, create_if_none:bool=True, local:bool=False):
+    return get_path_daily_folder(f'live_{strategy_name}', date, create_if_none, local)
+    
 
 def path_current_setup(path_current_file, ch_dir=True, print_path=True):
 
@@ -730,6 +722,8 @@ def get_tick_value(price):
 
 
 def get_symbol_seed_list(seed:int, base_folder:str=PATHS.folders_path['market_data']):
+    if not seed:
+        return []
     stock_list_file = os.path.join(base_folder, f"stock_list_seed{seed}.csv") if seed else None
     if not os.path.exists(stock_list_file):
         return []

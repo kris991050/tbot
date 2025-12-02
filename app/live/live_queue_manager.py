@@ -9,11 +9,12 @@ import live_loop_base
 
 
 class LiveQueueManager(live_loop_base.LiveLoopBase):
-    def __init__(self, wait_seconds:int=None, continuous:bool=True, single_symbol=None, tickers_list:dict={}, config=None, live_mode:str=None,
-                 ib_client_id:int=None, seed:int=None, paper_trading:bool=None, remote_ib:bool=None, timezone=None):
+    def __init__(self, wait_seconds:int=None, continuous:bool=True, single_symbol=None, tickers_list:dict={}, config=None, live_mode:str=None, 
+                 ib_client_id:int=None, strategy_name:str=None, seed:int=None, paper_trading:bool=None, remote_ib:bool=None, timezone=None):
 
         super().__init__(wait_seconds=wait_seconds, continuous=continuous, single_symbol=single_symbol, ib_disconnect=False,
-                         live_mode=live_mode, ib_client_id=ib_client_id, config=config, seed=seed, paper_trading=paper_trading, remote_ib=remote_ib, timezone=timezone)
+                         live_mode=live_mode, ib_client_id=ib_client_id, config=config, strategy_name=strategy_name, seed=seed, paper_trading=paper_trading, 
+                         remote_ib=remote_ib, timezone=timezone)
         self.symbols_seed = helpers.get_symbol_seed_list(self.config.seed)
         self.scan_rate = self.tmanager.strategy_instance.timeframe.to_seconds
         self.tickers_list = tickers_list or self.logger.load_tickers_list(lock=True)
@@ -108,9 +109,11 @@ if __name__ == "__main__":
     remote_ib = 'remote' in args
     # revised = 'revised' in args
     # seed = next((int(arg[5:]) for arg in args if arg.startswith('seed=')), None)
-    # strategy_name = next((arg[9:] for arg in args if arg.startswith('strategy=')), None)
-    wait_seconds = next((int(float(arg[5:])) for arg in args if arg.startswith('wait=')), 20)
+    strategy_name = next((arg[9:] for arg in args if arg.startswith('strategy=')), None)
+    wait_seconds = next((int(float(arg[5:])) for arg in args if arg.startswith('wait=')), 15)
     mode = next((arg[5:] for arg in args if arg.startswith('mode=')), 'live')
+    ib_client_id = next((int(arg[7:]) for arg in args if arg.startswith('client=')), -1)
 
-    qmanager = LiveQueueManager(wait_seconds=wait_seconds, live_mode=mode, paper_trading=paper_trading, remote_ib=remote_ib)
+    qmanager = LiveQueueManager(wait_seconds=wait_seconds, live_mode=mode, ib_client_id=ib_client_id, strategy_name=strategy_name, 
+                                paper_trading=paper_trading, remote_ib=remote_ib)
     qmanager.run()

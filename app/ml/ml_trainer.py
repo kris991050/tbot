@@ -655,7 +655,7 @@ if __name__ == "__main__":
     revised = 'revised' in args
     dd_mode = 'dd' in args
     strategy_name = next((arg[9:] for arg in args if arg.startswith('strategy=')), '')
-    selector = next((arg[9:] for arg in args if arg.startswith('selector=') and arg[9:] in ['rf', 'rfe', 'rfecv']), 'rfe')
+    selector = next((arg[9:] for arg in args if arg.startswith('selector=') and arg[9:] in ['rf', 'rfe', 'rfecv']), 'rf')
 
     # Setup
     model_type='xgboost'

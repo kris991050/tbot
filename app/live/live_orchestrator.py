@@ -19,7 +19,7 @@ class LiveOrchestrator:
         self.live_mode = helpers.set_var_with_constraints(live_mode, CONSTANTS.MODES['live'])
         self.config = trading_config.TradingConfig(live_mode=self.live_mode).set_config(locals())
         self.tmanager = trade_manager.TradeManager(self.ib, config=self.config)
-        self.logger = live_data_logger.LiveDataLogger(config=self.config)
+        self.logger = live_data_logger.LiveDataLogger(config=self.config, strategy_name=self.config.strategy_name)
         self.config.save_config(self.logger.config_file_path)
 
         self.max_fetchers = max_fetchers
@@ -51,7 +51,7 @@ class LiveOrchestrator:
         return  {
             'scans': {'wait_seconds': 3 * 60, 'ib_client_id': 9, 'pname': 'scans_fetcher'},
             'L2': {'wait_seconds': 5 * 60, 'ib_client_id': 10, 'pname': 'L2_fetcher'},
-            'queue': {'wait_seconds': 20, 'ib_client_id': -1, 'pname': 'queue_manager'},
+            'queue': {'wait_seconds': 15, 'ib_client_id': -1, 'pname': 'queue_manager'},
             'fetch': {'wait_seconds': 1 * scan_rate_min, 'ib_client_id': None, 'pname': 'data_fetcher'},
             'enrich': {'wait_seconds': 1 * scan_rate_min, 'ib_client_id': None, 'pname': 'data_enricher'},
             'execut': {'wait_seconds': 1 * scan_rate_min, 'ib_client_id': None, 'pname': 'data_executer'},
@@ -100,12 +100,12 @@ class LiveOrchestrator:
 
     def orchestrate_processes(self):
         print("🌐 Starting web server...")
-        self._run_web_server()
+        # self._run_web_server()
 
         # Start workers
-        self.run_scans_fetcher()
-        self.run_L2_fetcher()
-        self.run_queue_manager()
+        # self.run_scans_fetcher()
+        # self.run_L2_fetcher()
+        # self.run_queue_manager()
         # self.run_data_worker(wtype='fetch')
         # self.run_data_worker(wtype='enrich')
         # self.run_data_worker(wtype='execut')
@@ -126,13 +126,13 @@ class LiveOrchestrator:
 
         count = 0
 
-        while True:
+        while count < 20:
             self.ib.sleep(5)
             # pdict = {'name': f"process_{count}", 'pids': count, 'status': 'running'}
             # print(pdict)
             # self.processes.append(pdict)
-            # count += 1
-            # print()
+            count += 1
+            print("count = ", count)
             pass
 
 
