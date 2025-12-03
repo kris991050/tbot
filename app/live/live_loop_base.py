@@ -6,7 +6,7 @@ sys.path.append(parent_folder)
 from utils import helpers, logs
 from utils.constants import CONSTANTS
 from execution import trade_manager
-import trading_config, live_data_logger
+from live import trading_config, live_data_logger
 
 
 class LiveLoopBase:

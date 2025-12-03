@@ -6,8 +6,9 @@ parent_folder = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_folder)
 
 from utils.constants import CONSTANTS, PATHS
+from utils.timeframe import Timeframe
 from utils import helpers
-import live_scans_fetcher, live_L2_fetcher, live_worker, live_queue_manager
+from live import live_scans_fetcher, live_L2_fetcher, live_worker, live_queue_manager
 
 
 # def run_generic_fetcher(fetcher_class, fetcher_name, log_path, *fetcher_args, **fetcher_kwargs):
@@ -74,18 +75,19 @@ def run_live_worker(action:str, wait_seconds:int, look_backward:str, live_mode:s
 
 
 class ProcessManager:
-    def __init__(self, processes_params:dict, processes:list=[], new_terminal:bool=True, tail_log:bool=True, timezone=None):
+    def __init__(self, processes_params:dict=None, new_terminal:bool=True, tail_log:bool=True, timezone=None):
 
         self.ib = IB()
-        self.processes_params = processes_params
+        self.processes_params = processes_params or ProcessUtils.build_workers_params(int(Timeframe().to_seconds / 60))
         self.new_terminal = new_terminal
         self.tail_log = tail_log
         self.timezone = timezone or CONSTANTS.TZ_WORK
-        self.processes = processes
+        self.processes = []
 
     def launch_process(self, target, wtype:str):#args=(), log_path:str=None, pname:str=None):
+        wtype = helpers.set_var_with_constraints(wtype, CONSTANTS.WORKERS_TYPES['white'] + CONSTANTS.WORKERS_TYPES['blue'])
         args = self.processes_params[wtype]['args']
-        pname = self.processes_params[wtype]['pname']
+        pname = wtype#self.processes_params[wtype]['pname']
         log_folder = helpers.get_path_daily_logs_folder()
         log_path =  os.path.join(log_folder, f"process_{pname}.log")
 
@@ -96,7 +98,7 @@ class ProcessManager:
                 print(f"▶️ Starting process {pname}...")
                 process = subprocess.Popen(command, shell=True)
                 self.ib.sleep(5 * CONSTANTS.PROCESS_TIME['long'])
-                processes = ProcessUtils.get_process_by('cmdline', pname)
+                processes = ProcessUtils.get_process_by('cmdline', [pname])
                 pids = [proc['pid'] for proc in processes if isinstance(proc['cmdline'], list)]
             else:
                 print("❌ Could not determine terminal command for your OS.")
@@ -119,7 +121,7 @@ class ProcessManager:
             if self.tail_log and log_path != os.devnull:
                 self._tail_log_in_new_terminal(log_path)
                 self.ib.sleep(5 * CONSTANTS.PROCESS_TIME['long'])
-                processes_log = ProcessUtils.get_process_by('cmdline', pname)
+                processes_log = ProcessUtils.get_process_by('cmdline', [pname])
                 pids.extend([proc['pid'] for proc in processes_log if isinstance(proc['cmdline'], list)])
                 processes.extend(processes_log)
 
@@ -237,15 +239,31 @@ class ProcessManager:
 class ProcessUtils:
 
     @staticmethod
-    def get_process_by(attr:str, value:str):
+    def build_workers_params(scan_rate_min):
+        return  {
+            'scans_fetcher': {'wait_seconds': 3 * 60, 'ib_client_id': 9},#, 'pname': 'scans_fetcher'},
+            'L2_fetcher': {'wait_seconds': 5 * 60, 'ib_client_id': 10},#, 'pname': 'L2_fetcher'},
+            'queue_manager': {'wait_seconds': 15, 'ib_client_id': -1},#, 'pname': 'queue_manager'},
+            'data_fetcher': {'wait_seconds': 1 * scan_rate_min, 'ib_client_id': None},#, 'pname': 'data_fetcher'},
+            'data_enricher': {'wait_seconds': 1 * scan_rate_min, 'ib_client_id': None},#, 'pname': 'data_enricher'},
+            'data_executer': {'wait_seconds': 1 * scan_rate_min, 'ib_client_id': None},#, 'pname': 'data_executer'},
+            'live_orchestrator': {'wait_seconds': 20}#5 * scan_rate_min}
+        }
+    
+    @staticmethod
+    def get_process_by(attr:str, values:list):
         attr_list = ['cmdline', 'pid', 'name', 'status', 'create_time']
         # 'exe', 'cpu_times', 'cpu_percent', 'memory_percent', 'memory_info', 'io_counters', 'num_threads', 'threads', 'open_files', 'environ', 'nice', 'cpu_affinity'
-        if not value:
+        if not values:
             print(f"⚠️ Value for 'value' is needed")
             return[]
         if not attr or attr not in attr_list:
             print(f"⚠️ 'attr' must be within {attr_list}")
             return[]
+        
+        # Ensure value is a list for consistency
+        if not isinstance(values, list):
+            values = [values]
 
         pall = psutil.process_iter(attr_list)
         matched_processes = []
@@ -254,14 +272,27 @@ class ProcessUtils:
             proc_info = proc.info.get(attr, None)
             if not proc_info:
                 continue
-
-            condition_num = isinstance(proc_info, (int, float)) and proc_info == value
-            condition_str = isinstance(proc_info, str) and value in proc_info
-            condition_list = isinstance(proc_info, list) and all(isinstance(p, str) for p in proc_info) and any([value in p for p in proc_info])
+            
+            for value in values:
+                condition_num = isinstance(proc_info, (int, float)) and proc_info == value
+                condition_str = isinstance(proc_info, str) and value in proc_info
+                condition_list = isinstance(proc_info, list) and all(isinstance(p, str) for p in proc_info) and any([value in p for p in proc_info])
+                if condition_num or condition_str or condition_list:
+                    print()
+            
+            # Check if any value in the list matches
+            condition_num = isinstance(proc_info, (int, float)) and proc_info in values
+            condition_str = isinstance(proc_info, str) and any(val in proc_info for val in values)
+            # condition_list = isinstance(proc_info, list) and any(val in proc_info for val in values)
+            condition_list = isinstance(proc_info, list) and any(any(val in item for item in proc_info) for val in values)
+            
+            # If any of the conditions match, append the process info
             if condition_num or condition_str or condition_list:
                 matched_processes.append({**proc.info,
-                                            'create_time': datetime.fromtimestamp(proc.info['create_time']).strftime('%Y-%m-%d %H:%M:%S')
-                                            if 'create_time' in proc.info else None})
+                    'create_time': datetime.fromtimestamp(proc.info['create_time']).strftime('%Y-%m-%d %H:%M:%S')
+                    if 'create_time' in proc.info else None
+                })
+                
         return matched_processes
         # matched_processes = [{
         #     **proc.info, # Copy all info of the process
@@ -271,6 +302,38 @@ class ProcessUtils:
         #          if not isinstance(proc.info.get(attr, ''), (int, float)) else proc.info.get(attr, '') == value)  # Filter based on the value in the specified attribute
         #     ]
         # return matched_processes
+    
+    # @staticmethod
+    # def get_process_by2(attr:str, value):
+    #     attr_list = ['cmdline', 'pid', 'name', 'status', 'create_time']
+    #     # 'exe', 'cpu_times', 'cpu_percent', 'memory_percent', 'memory_info', 'io_counters', 'num_threads', 'threads', 'open_files', 'environ', 'nice', 'cpu_affinity'
+    #     if not value:
+    #         print(f"⚠️ Value for 'value' is needed")
+    #         return[]
+    #     if not attr or attr not in attr_list:
+    #         print(f"⚠️ 'attr' must be within {attr_list}")
+    #         return[]
+
+    #     pall = psutil.process_iter(attr_list)
+    #     matched_processes = []
+
+    #     for proc in pall:
+    #         proc_info = proc.info.get(attr, None)
+    #         if not proc_info:
+    #             continue
+
+    #         condition_num = isinstance(proc_info, (int, float)) and proc_info == value
+    #         condition_str = isinstance(proc_info, str) and value in proc_info
+    #         condition_list = isinstance(proc_info, list) and all(isinstance(p, str) for p in proc_info) and any([value in p for p in proc_info])
+            
+    #         # If any of the conditions match, append the process info
+    #         if condition_num or condition_str or condition_list:
+    #             matched_processes.append({**proc.info,
+    #                 'create_time': datetime.fromtimestamp(proc.info['create_time']).strftime('%Y-%m-%d %H:%M:%S')
+    #                 if 'create_time' in proc.info else None
+    #             })
+                
+    #     return matched_processes
 
     @staticmethod
     def list_all_processes():
@@ -284,6 +347,72 @@ class ProcessUtils:
                 continue
         return processes
 
+    def update_process_list(processes:list, worker_types:list=None):
+        """Update the list of processes in ProcessManager."""
+        
+        worker_types = worker_types or CONSTANTS.WORKERS_TYPES['white'] + CONSTANTS.WORKERS_TYPES['blue']
+        
+        # Fetch all processes for the worker types in a single query
+        print(f"🔎 Searching processes for worker types: {worker_types}...")
+
+        # Search for all matching processes by cmdline
+        processes_for_workers = ProcessUtils.get_process_by('cmdline', worker_types)
+        
+        # Group the processes by worker type
+        processes_by_worker = {worker_type: [] for worker_type in worker_types}
+        
+        for proc in processes_for_workers:
+            # Check which worker type this process belongs to by matching the worker type in cmdline
+            for worker_type in worker_types:
+                if any(worker_type in cmd for cmd in proc['cmdline']):
+                    processes_by_worker[worker_type].append(proc)
+                    break
+
+        # Update the processes list based on the matching worker types
+        for worker_type in worker_types:
+            # Filter out the old entries for this worker type
+            processes = [process for process in processes if process['name'] != worker_type]
+            
+            if processes_by_worker[worker_type]:
+                # If processes are found, update the process list with the current processes for this worker type
+                for process in processes_by_worker[worker_type]:
+                    processes.append({
+                        'name': worker_type,
+                        'pids': [process['pid']],
+                        'status': 'running'
+                    })
+
+        print(f"Checked processes: {processes}")
+        return processes
+    
+    # @staticmethod
+    # def update_process_list2(processes:list, worker_types:list=None):
+    #     """Update the list of processes in ProcessManager."""
+    #     worker_types = worker_types or CONSTANTS.WORKERS_TYPES['white'] + CONSTANTS.WORKERS_TYPES['blue']
+    #     for worker_type in worker_types:
+    #         print(f"🔎 Searching processes for {worker_type}...")
+    #         processes_for_worker = ProcessUtils.get_process_by2('cmdline', worker_type)#('name', worker_type)
+    #         if processes_for_worker:
+    #             # If processes are found for this worker type, update the process list
+    #             processes = [process for process in processes if process['name'] != worker_type]
+    #             for process in processes_for_worker:
+    #                 processes.append({
+    #                     'name': worker_type,
+    #                     'pids': [process['pid']],
+    #                     'status': 'running'
+    #                 })
+    #         # else:
+    #         #     # If no processes are found, set the status as 'dead'
+    #         #     self.pmanager.processes = [process for process in self.pmanager.processes if process['name'] != worker_type]
+    #         #     self.pmanager.processes.append({
+    #         #         'name': worker_type,
+    #         #         'pids': [],
+    #         #         'status': 'dead'
+    #         #     })
+                
+    #     print(f"Checked processes: {processes}")
+    #     return processes
+    
     @staticmethod
     def parse_arg(arg):
         if arg.lower() == 'true':

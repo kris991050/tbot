@@ -5,7 +5,7 @@ parent_folder = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_folder)
 
 from utils import helpers
-import live_loop_base
+from live import live_loop_base
 
 
 class LiveQueueManager(live_loop_base.LiveLoopBase):

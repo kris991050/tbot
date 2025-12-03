@@ -3,7 +3,158 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="refresh" content="5">  <!-- Auto-refresh every 5 seconds -->
+    <meta http-equiv="refresh" content="5">
+    <title>tBot Dashboard</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 14px;  /* Reduced font size */
+            background-color: #2e2e2e;  /* Dark background */
+            color: #f0f0f0;  /* Light text */
+        }
+        h1, h2 {
+        color: #e0e0e0;  /* Lighter headers */
+        }
+        h2 {
+            margin-top: 40px;
+        }
+        table {
+            width: 60%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            background-color: #3a3a3a; /* Dark table background */
+        }
+        th, td {
+            padding: 8px;
+            border: 1px solid #555;
+            text-align: center;
+        }
+        .status-dot {
+            height: 12px;
+            width: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .running { background-color: #00cc44; }
+        .dead { background-color: #cc0000; }
+        .btn {
+            padding: 4px 10px;
+            border-radius: 4px;
+            background-color: #007bff;
+            color: #fff;
+            text-decoration: none;
+        }
+        .btn-stop {
+            background-color: #cc0000;
+        }
+        .btn-start {
+            background-color: #00aa00;
+        }
+    </style>
+</head>
+<body>
+    <h1>tBot Dashboard</h1>
+
+    {% for wtype, entries in grouped.items() %}
+        <h2>{{ wtype }}</h2>
+
+        <!-- Show the Start button if no processes are running -->
+        <!-- {% if entries | length == 0 %} -->
+        <a class="btn btn-start" href="{{ url_for('start_worker', wtype=wtype) }}">➕ Start New {{ wtype }}</a>
+        <!-- {% endif %} -->
+
+        <!-- Show the process table only if there are any entries (running processes) -->
+        {% if entries | length > 0 %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>PID</th>
+                        <th>Status</th>
+                        <th>Stop</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for worker_instances in entries %}
+                        {% for instance in worker_instances %}
+                            <tr>
+                                <td>{{ instance.pid }}</td>
+                                <td>
+                                    {% if instance.alive %}
+                                        <span class="status-dot running"></span> Running
+                                    {% else %}
+                                        <span class="status-dot dead"></span> Dead
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if instance.alive %}
+                                        <a class="btn btn-stop" href="{{ url_for('stop_pid', pid=instance.pid) }}">⛔ Stop</a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    {% endfor %}
+</body>
+</html>
+
+<!-- <body>
+
+    <h1>tBot Dashboard</h1>
+
+    {% for wtype, entries in grouped.items() %}
+        <h2>{{ wtype }}</h2>
+
+        <a class="btn btn-start" href="{{ url_for('start_worker', wtype=wtype) }}">➕ Start New {{ wtype }}</a>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>PID</th>
+                    <th>Status</th>
+                    <th>Stop</th>
+                </tr>
+            </thead>
+
+            <tbody>
+            {% for worker_instances in entries %}
+                {% for instance in worker_instances %}
+                    <tr>
+                        <td>{{ instance.pid }}</td>
+                        <td>
+                            {% if instance.alive %}
+                                <span class="status-dot running"></span> Running
+                            {% else %}
+                                <span class="status-dot dead"></span> Dead
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if instance.alive %}
+                                <a class="btn btn-stop" href="{{ url_for('stop_pid', pid=instance.pid) }}">⛔ Stop</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endfor %}
+
+</body>
+</html> -->
+
+
+
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="5">
     <title>Live Orchestrator Dashboard</title>
 </head>
 <body>
@@ -35,4 +186,4 @@
         </tbody>
     </table>
 </body>
-</html>
+</html> -->

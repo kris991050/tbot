@@ -26,37 +26,19 @@ class LiveOrchestrator:
         self.max_enrichers = max_enrichers
         self.new_terminal = new_terminal
         self.tail_log = tail_log
-        self.workers_list = {'white': ['scans', 'L2', 'queue'], 'blue': ['fetch', 'enrich', 'execut']}
-        self.processes = []
+        self.workers_list = CONSTANTS.WORKERS_TYPES
+        # self.processes = []
         self.workers_params = self._build_workers_params()
         self.processes_params = self._build_processes_params()
-        self.pmanager = process_manager.ProcessManager(processes_params=self.processes_params, processes=self.processes, new_terminal=self.new_terminal,
+        self.pmanager = process_manager.ProcessManager(processes_params=self.processes_params, new_terminal=self.new_terminal,
                                                        tail_log=self.tail_log, timezone=self.tmanager.tz)
-        # self.mtp_manager = multiprocessing.Manager()
-        # self.tickers_list = self.mtp_manager.dict()
-        # self.fetch_queue = self.mtp_manager.Queue()
-        # self.enrich_queue = self.mtp_manager.Queue()
-        # self.fetch_queue = multiprocessing.Queue()
-        # self.enrich_queue = multiprocessing.Queue()
-        # self.tickers_list = self.logger.load_tickers_list(lock=True)
-        # self.fetch_queue = self.logger.get_queue('fetch', lock=True)
-        # self.enrich_queue = self.logger.get_queue('enrich', lock=True)
-        # self.execite_queue = self.logger.get_queue('execut', lock=True)
 
         # Flask setup
-        self.webserver = web_tbot.WebTbotServer(self.processes)
+        self.webserver = web_tbot.WebTbotServer(pmanager=self.pmanager)
 
     def _build_workers_params(self):
         scan_rate_min = int(self.tmanager.strategy_instance.timeframe.to_seconds / 60)
-        return  {
-            'scans': {'wait_seconds': 3 * 60, 'ib_client_id': 9, 'pname': 'scans_fetcher'},
-            'L2': {'wait_seconds': 5 * 60, 'ib_client_id': 10, 'pname': 'L2_fetcher'},
-            'queue': {'wait_seconds': 15, 'ib_client_id': -1, 'pname': 'queue_manager'},
-            'fetch': {'wait_seconds': 1 * scan_rate_min, 'ib_client_id': None, 'pname': 'data_fetcher'},
-            'enrich': {'wait_seconds': 1 * scan_rate_min, 'ib_client_id': None, 'pname': 'data_enricher'},
-            'execut': {'wait_seconds': 1 * scan_rate_min, 'ib_client_id': None, 'pname': 'data_executer'},
-            'orchestrator': {'wait_seconds': 20}#5 * scan_rate_min}
-        }
+        return process_manager.ProcessUtils.build_workers_params(scan_rate_min)
 
     def _build_args_worker(self, wtype, initialize:bool=True):
             # Case white worker
@@ -73,7 +55,7 @@ class LiveOrchestrator:
     def _build_processes_params(self):
         proc_args = {}
         for worker_type in self.workers_list['white'] + self.workers_list['blue']:
-            proc_args[worker_type] = {'args': self._build_args_worker(worker_type), 'pname': self.workers_params[worker_type]['pname']}
+            proc_args[worker_type] = {'args': self._build_args_worker(worker_type)}#, 'pname': self.workers_params[worker_type]['pname']}
         return proc_args
 
     def _run_web_server(self):
@@ -81,18 +63,19 @@ class LiveOrchestrator:
         web_thread = threading.Thread(target=self.webserver.start_web_server)
         web_thread.daemon = True  # This will allow the thread to exit when the main program exits
         web_thread.start()
+        # self.webserver.start_web_server()
 
     def run_scans_fetcher(self):
         print("⚡ Starting live scans fetcher...")
-        self.pmanager.launch_process(target=process_manager.run_live_scans_fetcher, wtype='scans')
+        self.pmanager.launch_process(target=process_manager.run_live_scans_fetcher, wtype='scans_fetcher')
 
     def run_L2_fetcher(self):
         print("⚡ Starting live L2 fetcher...")
-        self.pmanager.launch_process(target=process_manager.run_live_L2_fetcher, wtype='L2')
+        self.pmanager.launch_process(target=process_manager.run_live_L2_fetcher, wtype='L2_fetcher')
 
     def run_queue_manager(self):
         print("⚡ Starting live queue manager...")
-        self.pmanager.launch_process(target=process_manager.run_live_queue_manager, wtype='queue')
+        self.pmanager.launch_process(target=process_manager.run_live_queue_manager, wtype='queue_manager')
 
     def run_data_worker(self, wtype:str):
         print(f"⚡ Starting live data {wtype}er...")
@@ -100,39 +83,27 @@ class LiveOrchestrator:
 
     def orchestrate_processes(self):
         print("🌐 Starting web server...")
-        # self._run_web_server()
+        self._run_web_server()
 
         # Start workers
         # self.run_scans_fetcher()
         # self.run_L2_fetcher()
         # self.run_queue_manager()
-        # self.run_data_worker(wtype='fetch')
-        # self.run_data_worker(wtype='enrich')
-        # self.run_data_worker(wtype='execut')
-
-
-        # args_worker = (self.tmanager.strategy_name, self.config.stop, self.config.revised, self.config.step_duration, self.config.live_mode,
-        #                      self.config.sim_offset.total_seconds(), self.config.paper_trading, self.proc_params['fetch']['wait_seconds'])
-        # args_data_fetcher = ('fetch',) + args_worker
-
-        # Start data fetcher
-        # self._launch_process(process_launcher.run_live_worker, wtype='fetch')
-
-        # Start data enricher
-        # self._launch_process(process_launcher.run_live_worker, wtype='enrich')
-
-        # Start data enricher
-        # self._launch_process(process_launcher.run_live_worker, wtype='execut')
+        # self.run_data_worker(wtype='data_fetcher')
+        # self.run_data_worker(wtype='data_enricher')
+        # self.run_data_worker(wtype='data_executer')
 
         count = 0
 
-        while count < 20:
-            self.ib.sleep(5)
-            # pdict = {'name': f"process_{count}", 'pids': count, 'status': 'running'}
+        while True:#count < 20:
+            self.ib.sleep(2)
+            self.pmanager.processes = process_manager.ProcessUtils.update_process_list(processes=self.pmanager.processes)
+            # self.pmanager.processes = process_manager.ProcessUtils.update_process_list2(processes=self.pmanager.processes)
+            # pdict = {'name': f"process_{count}", 'pids': [count], 'status': 'running'}
             # print(pdict)
-            # self.processes.append(pdict)
-            count += 1
-            print("count = ", count)
+            # self.pmanager.processes.append(pdict)
+            # count += 1
+            # print("count = ", count)
             pass
 
 
@@ -238,6 +209,24 @@ if __name__ == "__main__":
     orchestrator = LiveOrchestrator(seed=seed, strategy_name=strategy_name, revised=revised, live_mode=mode, paper_trading=paper_trading, remote_ib=remote_ib,
                                     new_terminal=new_terminal, tail_log=tail_log)
     orchestrator.orchestrate_processes()
+
+
+
+
+
+# args_worker = (self.tmanager.strategy_name, self.config.stop, self.config.revised, self.config.step_duration, self.config.live_mode,
+        #                      self.config.sim_offset.total_seconds(), self.config.paper_trading, self.proc_params['fetch']['wait_seconds'])
+        # args_data_fetcher = ('fetch',) + args_worker
+
+        # Start data fetcher
+        # self._launch_process(process_launcher.run_live_worker, wtype='fetch')
+
+        # Start data enricher
+        # self._launch_process(process_launcher.run_live_worker, wtype='enrich')
+
+        # Start data enricher
+        # self._launch_process(process_launcher.run_live_worker, wtype='execut')
+
 
 
     # def fetch_worker(self):

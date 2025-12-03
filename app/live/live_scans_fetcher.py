@@ -1,10 +1,10 @@
-import sys, os, pandas as pd
+import sys, os
 from ib_insync import *
 parent_folder = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_folder)
 
 from miscellaneous import scanner
-import live_loop_base
+from live import live_loop_base
 from utils import helpers
 from utils.constants import PATHS
 from utils.timeframe import Timeframe

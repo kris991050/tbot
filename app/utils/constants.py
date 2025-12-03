@@ -88,6 +88,7 @@ class CONSTANTS():
         DEFAULT_TIMEFRAME = {'multiplier': 1, 'unit': 'minute'}
         DIRECTIONS = ['bull', 'bear']
         POSITION_SIZING_MODE = ['linear', 'exponential', 'logarithmic', 'sigmoid']
+        WORKERS_TYPES = {'white': ['scans_fetcher', 'L2_fetcher', 'queue_manager'], 'blue': ['data_fetcher', 'data_enricher', 'data_executer']}
 
         LEVELS_ROUNDING_PRECISION = 2
 

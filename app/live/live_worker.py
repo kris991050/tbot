@@ -3,7 +3,7 @@ from ib_insync import *
 parent_folder = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_folder)
 
-import live_loop_base
+from live import live_loop_base
 from data import hist_market_data_handler
 from utils import helpers, logs
 from datetime import datetime
