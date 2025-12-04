@@ -11,7 +11,7 @@ from features import indicators
 
 class SRBounceStrategy(base_strategy.BaseStrategy):
 
-    def __init__(self, direction:str, timeframe:Timeframe, sr_timeframes:list=['1D', '1W'], cam_M_threshold:int=3, revised:bool=False, 
+    def __init__(self, direction:str, timeframe:Timeframe, sr_timeframes:list=['1D', '1W'], cam_M_threshold:int=3, revised:bool=False,
                  target_factor:float=5, max_time_factor:int=50):
 
         self.base_name = 'sr_bounce'
@@ -33,11 +33,11 @@ class SRBounceStrategy(base_strategy.BaseStrategy):
         # self.target_handler = target_handler.TimeDeltaTargetHandler(time_target_factor * self.timeframe.to_timedelta)
         level_types = [f'sr_{sr_tf}' for sr_tf in self.sr_timeframes]
         max_time = max_time_factor * self.timeframe.to_timedelta
-        # self.target_handler = target_handler.NextLevelTargetHandler(level_types=level_types, timeframe=self.timeframe, direction=self.direction, 
+        # self.target_handler = target_handler.NextLevelTargetHandler(level_types=level_types, timeframe=self.timeframe, direction=self.direction,
         #                                                             max_time=max_time)
         # self.target_handler = target_handler.PercGainTargetHandler(perc_gain=target_factor, direction=self.direction, max_time=max_time)
         # self.target_handler = target_handler.ProfitRatioTargetHandler(profit_ratio=target_factor, direction=self.direction, max_time=max_time)
-        self.target_handler = target_handler.PredictedVolatilityTargetHandler(volatility_factor=target_factor, direction=self.direction, timeframe=self.timeframe, 
+        self.target_handler = target_handler.PredictedVolatilityTargetHandler(volatility_factor=target_factor, direction=self.direction, timeframe=self.timeframe,
                                                                               max_time=max_time)
         self.stop_handler = None
         self.required_columns = self._build_required_columns()
@@ -46,7 +46,7 @@ class SRBounceStrategy(base_strategy.BaseStrategy):
     def _build_required_columns(self):
         common_req_cols = [f'atr_{self.timeframe}', 'cam_M_position']
         olhc_req_cols = ['open', 'high', 'low', 'close', 'volume']
-        direction_req_cols = {'bear': [f'sr_{sr_tf}_dist_to_next_up' for sr_tf in self.sr_timeframes], 
+        direction_req_cols = {'bear': [f'sr_{sr_tf}_dist_to_next_up' for sr_tf in self.sr_timeframes],
                               'bull': [f'sr_{sr_tf}_dist_to_next_down' for sr_tf in self.sr_timeframes]}
         revised_req_cols = {'bear': [], 'bull': []}
 
@@ -84,9 +84,9 @@ class SRBounceStrategy(base_strategy.BaseStrategy):
         df[self.trigger_columns[0]] = helpers.apply_df_in_chunks(df, evaluate_func=self.evaluate_trigger, memory_threshold_MB=1500)
 
         return df
-import pandas as pd
+
 def sr_bounce_trigger_bull(row, timeframe, sr_timeframes, cam_M_threshold, revised=False):
-    
+
     # if row['date'] == pd.Timestamp('2020-01-30 00:00:00', tz=CONSTANTS.TZ_WORK):
     #     print()
     sr_conditions = [row[f'sr_{sr_tf}_dist_to_next_down'] <= row[f'atr_{timeframe}'] for sr_tf in sr_timeframes]

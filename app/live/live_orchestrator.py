@@ -208,7 +208,7 @@ if __name__ == "__main__":
 
     orchestrator = LiveOrchestrator(seed=seed, strategy_name=strategy_name, revised=revised, live_mode=mode, paper_trading=paper_trading, remote_ib=remote_ib,
                                     new_terminal=new_terminal, tail_log=tail_log)
-    orchestrator.orchestrate_processes()
+    # orchestrator.orchestrate_processes()
 
 
 

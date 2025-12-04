@@ -143,7 +143,7 @@ then
     echo "Starting stats_RSI-reversal script..."
     python stats_RSI-reversal.py $arg2 $arg3
 
-elif [ "$arg" = "liveScan" ]
+elif [ "$arg" = "liveScans" ]
 then
 
     cd /Volumes/untitled/T/tbot/app/live
@@ -156,6 +156,13 @@ then
     cd /Volumes/untitled/T/tbot/app/live
     echo "Starting live_L2_fetcher script..."
     python live_L2_fetcher.py $arg2 $arg3 $arg4 $arg5
+
+elif [ "$arg" = "queueManager" ]
+then
+
+    cd /Volumes/untitled/T/tbot/app/live
+    echo "Starting queue_manager script..."
+    python live_queue_manager.py $arg2 $arg3 $arg4 $arg5
 
 elif [ "$arg" = "liveOrchestrator" ]
 then

@@ -58,18 +58,18 @@ class TradingConfig:
 
         # Simualtion config
         self.live_mode = helpers.set_var_with_constraints(live_mode, CONSTANTS.MODES['live']) or 'live'
-        self.sim_start = self.timezone.localize(datetime.datetime(2025, 11, 21, 10, 0, 0))
+        self.sim_start = self.timezone.localize(datetime.datetime(2025, 12, 3, 9, 30, 0))
         self.sim_max_time = datetime.timedelta(hours=4, minutes=0)
         self.set_sim_offset()
-    
+
     def set_sim_offset(self):
         self.sim_offset = datetime.datetime.now(self.timezone) - self.sim_start if self.live_mode == 'sim' else datetime.timedelta(0) if self.live_mode == 'live' else None
-    
+
     def save_config(self, config_path):
         """ Save the config parameters to a JSON/YAML file """
         # Convert complex types to serializable types
         config_dict = self.__dict__.copy()  # Copy the original config
-        
+
         # Serialize timezone and datetime objects
         if isinstance(self.timezone, pytz.tzinfo.BaseTzInfo):
             config_dict['timezone'] = str(self.timezone)  # Save the timezone name (string)
@@ -80,14 +80,14 @@ class TradingConfig:
 
         helpers.save_json(config_dict, config_path, lock=False)
         print(f"💾 Saved config at {config_path}")
-    
+
     def load_config(self, config_path):
         """ Load the configuration from the file """
         # date_folder = helpers.get_path_date_folder(date)
         # config_path = os.path.join(date_folder, config_filename)
         if os.path.exists(config_path):
             loaded_config = helpers.load_json(config_path, lock=False)
-            
+
             # Convert complex types back to their original form
             if 'timezone' in loaded_config:
                 loaded_config['timezone'] = pytz.timezone(loaded_config['timezone'])  # Convert string back to timezone
@@ -108,16 +108,16 @@ class TradingConfig:
             # if 'sim_offset' in loaded_config and isinstance(loaded_config['sim_offset'], str):
             #     # Split the time string into hours, minutes, and seconds
             #     time_parts = loaded_config['sim_offset'].split(':')
-                
+
             #     # Parse hours and minutes as integers
             #     hours = int(time_parts[0])
             #     minutes = int(time_parts[1])
-                
+
             #     # The seconds part can be split into whole seconds and fractional seconds
             #     seconds_and_fraction = time_parts[2].split('.')
             #     seconds = int(seconds_and_fraction[0])  # Whole seconds
             #     fractional_seconds = float(f"0.{seconds_and_fraction[1]}") if len(seconds_and_fraction) > 1 else 0.0  # Fractional part as float
-                
+
             #     # Create a timedelta with fractional seconds
             #     loaded_config['sim_offset'] = datetime.timedelta(hours=hours, minutes=minutes, seconds=seconds, microseconds=fractional_seconds * 1e6)
 
@@ -140,7 +140,7 @@ class TradingConfig:
                 seconds_and_fraction = time_parts[2].split('.')  # Separate seconds and fractional part
                 seconds = int(seconds_and_fraction[0])  # Whole seconds
                 fractional_seconds = float(f"0.{seconds_and_fraction[1]}") if len(seconds_and_fraction) > 1 else 0.0  # Fractional seconds
-                
+
                 # Create a timedelta including days, hours, minutes, seconds, and fractional seconds
                 loaded_config['sim_offset'] = datetime.timedelta(days=days, hours=hours, minutes=minutes,
                                                                 seconds=seconds, microseconds=fractional_seconds * 1e6)
@@ -148,7 +148,7 @@ class TradingConfig:
             return self.set_config(loaded_config)
         else:
             return None
-    
+
     def set_config(self, locals):
         # Replace config parameters if provided locally
         for param, value in locals.items():
@@ -156,16 +156,16 @@ class TradingConfig:
                 setattr(self, param, value)
         self.set_sim_offset()
         return self
-    
+
     # @staticmethod
     # def load_config_param(param_name, default_value, locals, config_file=None):
     #     # First, check if the parameter is explicitly provided
     #     if param_name in locals:
     #         return locals[param_name]
-        
+
     #     # Second, check if the parameter is in the daily config file
     #     if config_file and param_name in config_file:
     #         return config_file[param_name]
-        
+
     #     # Last, fall back to the default value
     #     return default_value
