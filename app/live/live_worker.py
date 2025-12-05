@@ -124,9 +124,11 @@ class LiveWorker(live_loop_base.LiveLoopBase):
             if not open_position:
                 oorder = trade_executor.OOrder(symbol=symbol, stop_loss=stop_price, take_profit=target_price, quantity=quantity, config=self.config)
                 if self.config.live_mode == 'live':
-                    price_diff_threshold = (target_price - last_row['close']) / self.config.rrr_threshold if (target_price and self.config.rrr_threshold) \
-                        else 0.05 * last_row['close'] # Fallback if no stop_price. In case no target_price as well, max price diff is 5% of price.
-                    order, TPSL_order = self.executor.execute_order(self.tmanager.direction, oorder, last_row('close)'), price_diff_threshold)
+                    # price_diff_threshold = abs(target_price - last_row['close']) / self.config.rrr_threshold if (target_price and self.config.rrr_threshold) \
+                    #     else 0.05 * last_row['close'] # Fallback if no stop_price. In case no target_price as well, max price diff is 5% of price.
+                    price_diff_threshold = abs(((target_price + self.config.rrr_threshold * stop_price) / (1 + self.config.rrr_threshold)) - last_row['close']) \
+                        if (target_price and stop_price and self.config.rrr_threshold) else 0.05 * last_row['close'] # Fallback if no stop_price. In case no target_price as well, max price diff is 5% of price.
+                    order, TPSL_order = self.executor.execute_order(self.tmanager.direction, oorder, last_row['close'], price_diff_threshold)
                 now = helpers.calculate_now(self.config.sim_offset, self.config.timezone)
                 self.ib.sleep(CONSTANTS.PROCESS_TIME['long'])
                 order_status = order.orderStatus.status if hasattr(order, 'orderStatus') else None

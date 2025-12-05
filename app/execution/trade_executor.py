@@ -18,14 +18,14 @@ class OOrder():
         self.quantity = quantity
         self.order_type = type
         self.currency = helpers.get_stock_currency_yf(symbol) or self.config.currency
-        
+
 
 class TradeExecutor():
     def __init__(self, ib=IB(), config=None):
         self.ib = ib
         self.config = config or trading_config.TradingConfig().set_config(locals())
         self.equity = self._get_equity()
-            
+
     def _get_equity(self):
         account_values = self.ib.accountValues()
         self.ib.sleep(constants.CONSTANTS.PROCESS_TIME['long'])
@@ -42,9 +42,14 @@ class TradeExecutor():
             price = mktData.ask if direction == 1 else (mktData.bid if direction == -1 else None)
             price_bis = mktData.bid if direction == 1 else (mktData.ask if direction == -1 else None)
 
-            # CHeck if price used for evaluation not too different from real price
+            # Check if price used for evaluation not too different from real price
             if ideal_price and price_diff_threshold and abs(price - ideal_price) > price_diff_threshold:
                 print(f"🚧 Price {price} - ideal price {ideal_price} > max threshold {price_diff_threshold}. Trade not executed for {oorder.symbol}.")
+                return None, None
+
+            # Check if real price not past the stop price
+            if oorder.stop_loss and (price - oorder.stop_loss) * direction <= 0:
+                print(f"🚧 Price {price} beyond stop_loss {oorder.stop_loss} with direction {direction}. Trade not executed for {oorder.symbol}.")
                 return None, None
 
             # Place order
@@ -80,7 +85,7 @@ class TradeExecutor():
 
         # Adjust bracket orders
         orders.adjust_bracket_orders(self.ib, oorder.symbol, oorder.currency)
-    
+
     def set_max_quantity(self, stop_loss, price, currency, direction, max_loss_percentage):
         equity = float([accountValue.value for accountValue in self.accountValues() if accountValue.tag == 'CashBalance' and accountValue.currency == currency][0])
         # equity = 1500
