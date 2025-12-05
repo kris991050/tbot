@@ -240,7 +240,7 @@ class TradeManager:
 
     #         return quantity
 
-    def evaluate_quantity(self, prediction:float, price:float, capital:float, risk_pct:float, exp_factor:float=0.5):
+    def evaluate_quantity(self, prediction:float, price:float, stop_price:float, capital:float, risk_pct:float, exp_factor:float=0.5):
         '''
         **Linear Scaling**: Position increases gradually as the prediction improves above the threshold.
         **Exponential Scaling**: Small improvements in prediction lead to much larger increases in position size.
@@ -255,26 +255,30 @@ class TradeManager:
             if not self.config.pred_th or prediction < self.config.pred_th:
                 return 0
             
-            # Calculate the tier range (distance between prediction threshold and max prediction)
-            tier_range = (1.0 - self.config.pred_th) / self.config.tier_max
+            if stop_price:
+                # Calculate the tier range (distance between prediction threshold and max prediction)
+                tier_range = (1.0 - self.config.pred_th) / self.config.tier_max
 
-            linear_factor = min(int((prediction - self.config.pred_th) / tier_range) + 1, self.config.tier_max)
-            exponential_factor = int(math.exp(exp_factor * (prediction - self.config.pred_th) / tier_range))
-            logarithmic_factor = int(math.log((prediction - self.config.pred_th) / tier_range + 1)) + 1
-            sigmoid_factor = int((1 / (1 + math.exp(-10 * (prediction - self.config.pred_th) / tier_range))) * self.config.tier_max)
+                linear_factor = min(int((prediction - self.config.pred_th) / tier_range) + 1, self.config.tier_max)
+                exponential_factor = int(math.exp(exp_factor * (prediction - self.config.pred_th) / tier_range))
+                logarithmic_factor = int(math.log((prediction - self.config.pred_th) / tier_range + 1)) + 1
+                sigmoid_factor = int((1 / (1 + math.exp(-10 * (prediction - self.config.pred_th) / tier_range))) * self.config.tier_max)
 
-            if growth_mode == 'linear':
-                quantity_factor = linear_factor    
-            elif growth_mode == 'exponential':
-                quantity_factor = exponential_factor
-            elif growth_mode == 'logarithmic':
-                quantity_factor = logarithmic_factor
-            elif growth_mode == 'sigmoidal':
-                quantity_factor = sigmoid_factor
+                if growth_mode == 'linear':
+                    quantity_factor = linear_factor    
+                elif growth_mode == 'exponential':
+                    quantity_factor = exponential_factor
+                elif growth_mode == 'logarithmic':
+                    quantity_factor = logarithmic_factor
+                elif growth_mode == 'sigmoidal':
+                    quantity_factor = sigmoid_factor
+            else:
+                quantity_factor = 1 # If no stop_price, fallback on the lowest tier
 
             # Calculate the quantity based on the risk percentage and capital
             risk_pct_adjusted = risk_pct * quantity_factor
-            quantity = min(math.ceil(risk_pct_adjusted * capital / price), capital * 0.9 / price) # 0.9 to keep a buffer and not buy more than the available capital
+            risk = price - stop_price
+            quantity = min(math.ceil(risk_pct_adjusted * capital / risk), capital * 0.9 / risk) # 0.9 to keep a buffer and not buy more than the available capital
             return quantity
 
 

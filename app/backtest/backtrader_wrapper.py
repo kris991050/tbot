@@ -198,7 +198,8 @@ class BacktraderStrategyWrapper(bt.Strategy):
                 self.entry_time = curr_row['date']
                 self.decision_prediction = decision_row['model_prediction']
                 self.entry_prediction = curr_row['model_prediction']
-                self.quantity = self.tmanager.evaluate_quantity(self.entry_prediction, self.entry_price, self.broker.get_cash(), self.tmanager.config.risk_pct)
+                self.quantity = self.tmanager.evaluate_quantity(self.entry_prediction, self.entry_price, self.active_stop_price, 
+                                                                self.broker.get_cash(), self.tmanager.config.risk_pct)
                 self.order = self.execute_order('entry')
                 decision_row = self.tmanager.add_pred_vlty(curr_row, self.symbol)
 

@@ -34,7 +34,7 @@ class TradeExecutor():
         else:
             return self.config.capital
 
-    def execute_order(self, direction:int, oorder:OOrder):
+    def execute_order(self, direction:int, oorder:OOrder, ideal_price:float=None, price_diff_threshold:float=None):
         contract, mktData = helpers.get_symbol_mkt_data(self.ib, oorder.symbol, currency=oorder.currency)
 
         if mktData:
@@ -42,10 +42,10 @@ class TradeExecutor():
             price = mktData.ask if direction == 1 else (mktData.bid if direction == -1 else None)
             price_bis = mktData.bid if direction == 1 else (mktData.ask if direction == -1 else None)
 
-            # Check if trying to place stop loss and take profit when reducing existing position
-            open_position = orders.get_positions_by_symbol(self.ib, oorder.symbol)
-            if open_position and (open_position[0].position >= 0 and direction == -1 or open_position[0].position < 0 and direction == 1):
-                simple_order = True
+            # CHeck if price used for evaluation not too different from real price
+            if ideal_price and price_diff_threshold and abs(price - ideal_price) > price_diff_threshold:
+                print(f"🚧 Price {price} - ideal price {ideal_price} > max threshold {price_diff_threshold}. Trade not executed for {oorder.symbol}.")
+                return None, None
 
             # Place order
             order, TPSL_order = orders.autoOrder(self.ib, contract, direction, oorder.quantity, mktData, self.config.offset_targets, oorder.take_profit, oorder.stop_loss, oorder.order_type)#, TP_qty=delta_TP, SL_qty=delta_SL)#, ocaGroup=ocaGroup, ocaType=2)
@@ -56,7 +56,7 @@ class TradeExecutor():
             return order, TPSL_order
 
         else:
-            print(f"Could not execute order, no Market Data found for {oorder.symbol}")
+            print(f"📵 Could not execute order, no Market Data found for {oorder.symbol}.")
             return None, None
 
     def close_position(self, oorder:OOrder, partial:int=100):
@@ -73,7 +73,7 @@ class TradeExecutor():
                 direction = 1 if oorder_copy.quantity < 0 else -1
                 text_close = 'Closing' if partial == 100 else 'Partialling'
                 print(text_close, ' position for symbol ', oorder_copy.symbol)
-                self.execute_order(self.ib, direction, oorder_copy, simple_order=True)
+                self.execute_order(self.ib, direction, oorder_copy)
                 self.ib.sleep(constants.CONSTANTS.PROCESS_TIME['short'])
         else:
             print('\nNo position found for this symbol')

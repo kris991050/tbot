@@ -237,16 +237,17 @@ class ProcessManager:
 
 
 class ProcessUtils:
-
     @staticmethod
     def build_workers_params(scan_rate_min):
+        qm_wait_seconds = round(1.8129928244517726 * scan_rate_min ** 0.4054470965496836, 0) # Parameters found by curve fitting
+        bworkers_wait_seconds = round(1.9555599606573566 * scan_rate_min ** 0.24176996187317087, 0) # Parameters found by curve fitting
         return  {
             'scans_fetcher': {'wait_seconds': 3 * 60, 'ib_client_id': 9},#, 'pname': 'scans_fetcher'},
             'L2_fetcher': {'wait_seconds': 5 * 60, 'ib_client_id': 10},#, 'pname': 'L2_fetcher'},
-            'queue_manager': {'wait_seconds': 15, 'ib_client_id': -1},#, 'pname': 'queue_manager'},
-            'data_fetcher': {'wait_seconds': 1 * scan_rate_min, 'ib_client_id': None},#, 'pname': 'data_fetcher'},
-            'data_enricher': {'wait_seconds': 1 * scan_rate_min, 'ib_client_id': None},#, 'pname': 'data_enricher'},
-            'data_executer': {'wait_seconds': 1 * scan_rate_min, 'ib_client_id': None},#, 'pname': 'data_executer'},
+            'queue_manager': {'wait_seconds': qm_wait_seconds, 'ib_client_id': -1},#, 'pname': 'queue_manager'},
+            'data_fetcher': {'wait_seconds': bworkers_wait_seconds, 'ib_client_id': None},#, 'pname': 'data_fetcher'},
+            'data_enricher': {'wait_seconds': bworkers_wait_seconds, 'ib_client_id': None},#, 'pname': 'data_enricher'},
+            'data_executer': {'wait_seconds': bworkers_wait_seconds, 'ib_client_id': None},#, 'pname': 'data_executer'},
             'live_orchestrator': {'wait_seconds': 20}#5 * scan_rate_min}
         }
     

@@ -122,7 +122,8 @@ class CustomBacktestEngine:
                     self.entry_exec_price = entry_price * (1 + self.tmanager.direction * self.slippage_pct)
                     decision_prediction = decision_row['model_prediction']
                     entry_prediction = curr_row['model_prediction']
-                    quantity = self.tmanager.evaluate_quantity(entry_prediction, entry_price, self.tmanager.config.capital, self.tmanager.config.risk_pct)
+                    quantity = self.tmanager.evaluate_quantity(entry_prediction, entry_price, self.active_stop_price, 
+                                                               self.tmanager.config.capital, self.tmanager.config.risk_pct)
                     curr_row = self.tmanager.add_pred_vlty(curr_row, self.symbol)
 
                     # Resolve stop once here

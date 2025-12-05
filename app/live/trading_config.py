@@ -21,7 +21,7 @@ class TradingConfig:
         self.pred_th: float = 0.5
 
         # Risk and stop config
-        self.rrr_threshold: float = 0.5
+        self.rrr_threshold: float = 1
         self.tier_max: int = 5
         self.size = 'exponential'
         self.offset_targets: int = 10

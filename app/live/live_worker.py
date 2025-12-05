@@ -116,7 +116,7 @@ class LiveWorker(live_loop_base.LiveLoopBase):
             # Set target entry time and price
             self.tmanager.set_target_for_entry(row=last_row, stop_price=stop_price, symbol=symbol)
             target_price = self.tmanager.strategy_instance.target_handler.target_price
-            quantity = self.tmanager.evaluate_quantity(last_row['model_prediction'])
+            quantity = self.tmanager.evaluate_quantity(last_row['model_prediction'], last_row['close'], stop_price, self.config.capital, self.config.risk_pct)
             # values = self._create_trade_params(symbol, stop_price, target_price, quantity)
 
             open_position = orders.get_positions_by_symbol(self.ib, symbol)
@@ -124,7 +124,9 @@ class LiveWorker(live_loop_base.LiveLoopBase):
             if not open_position:
                 oorder = trade_executor.OOrder(symbol=symbol, stop_loss=stop_price, take_profit=target_price, quantity=quantity, config=self.config)
                 if self.config.live_mode == 'live':
-                    order, TPSL_order = self.executor.execute_order(self.tmanager.direction, oorder)
+                    price_diff_threshold = (target_price - last_row['close']) / self.config.rrr_threshold if (target_price and self.config.rrr_threshold) \
+                        else 0.05 * last_row['close'] # Fallback if no stop_price. In case no target_price as well, max price diff is 5% of price.
+                    order, TPSL_order = self.executor.execute_order(self.tmanager.direction, oorder, last_row('close)'), price_diff_threshold)
                 now = helpers.calculate_now(self.config.sim_offset, self.config.timezone)
                 self.ib.sleep(CONSTANTS.PROCESS_TIME['long'])
                 order_status = order.orderStatus.status if hasattr(order, 'orderStatus') else None
@@ -148,9 +150,9 @@ class LiveWorker(live_loop_base.LiveLoopBase):
             else:
                 print(f"Could not execute order for {symbol} or already existing open position.")
 
-            return last_row.to_frame().T
-        else:
-            return pd.DataFrame()
+        return last_row.to_frame().T
+        # else:
+        #     return pd.DataFrame()
 
     def _run_worker(self):
         df = pd.DataFrame()

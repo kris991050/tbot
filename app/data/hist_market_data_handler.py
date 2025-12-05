@@ -607,8 +607,10 @@ class HistMarketDataEnricher:
                     results.append({'df': df_enriched, 'path': enriched_path})
                 # except Exception as e:
                 #     print(f"❌ Error processing {path}: {e}")
-
-            print(f"⏱️ Elapsed time for full enrichment of symbol {symbol}: {datetime.now() - t1}\n\n")
+            
+            print("\n", "-" * 70)
+            print(f"⏱️ Elapsed time for full enrichment of symbol {symbol}: {datetime.now() - t1}")
+            print("-" * 71, "\n\n")
             print(self.separation_text)
 
         return results
