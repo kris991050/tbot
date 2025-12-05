@@ -55,7 +55,7 @@ if __name__ == "__main__":
     remote_ib = 'remote' in args
     continuous = not 'snapshot' in args
     wait_seconds = next((int(float(arg[5:])) for arg in args if arg.startswith('wait=')), 3*60)
-    ib_client_id = next((int(arg[7:]) for arg in args if arg.startswith('client=')), 9)
+    ib_client_id = next((int(arg[7:]) for arg in args if arg.startswith('client=')), 29)
 
     fetcher = LiveScansFetcher(wait_seconds=wait_seconds, continuous=continuous, ib_client_id=ib_client_id, paper_trading=paper_trading, remote_ib=remote_ib)
     fetcher.run()

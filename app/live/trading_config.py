@@ -1,4 +1,5 @@
-import sys, os, datetime, pytz
+import sys, os, pytz
+from datetime import datetime, timedelta
 
 parent_folder = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_folder)
@@ -58,12 +59,12 @@ class TradingConfig:
 
         # Simualtion config
         self.live_mode = helpers.set_var_with_constraints(live_mode, CONSTANTS.MODES['live']) or 'live'
-        self.sim_start = self.timezone.localize(datetime.datetime(2025, 12, 3, 9, 30, 0))
-        self.sim_max_time = datetime.timedelta(hours=4, minutes=0)
+        self.sim_start = self.timezone.localize(datetime(2025, 12, 4, 9, 30, 0))
+        self.sim_max_time = timedelta(hours=4, minutes=0)
         self.set_sim_offset()
 
     def set_sim_offset(self):
-        self.sim_offset = datetime.datetime.now(self.timezone) - self.sim_start if self.live_mode == 'sim' else datetime.timedelta(0) if self.live_mode == 'live' else None
+        self.sim_offset = datetime.now(self.timezone) - self.sim_start if self.live_mode == 'sim' else timedelta(0) if self.live_mode == 'live' else None
 
     def save_config(self, config_path):
         """ Save the config parameters to a JSON/YAML file """
@@ -73,9 +74,9 @@ class TradingConfig:
         # Serialize timezone and datetime objects
         if isinstance(self.timezone, pytz.tzinfo.BaseTzInfo):
             config_dict['timezone'] = str(self.timezone)  # Save the timezone name (string)
-        if isinstance(self.sim_start, datetime.datetime):
+        if isinstance(self.sim_start, datetime):
             config_dict['sim_start'] = self.sim_start.isoformat()  # Save datetime as string
-        if isinstance(self.sim_max_time, datetime.timedelta):
+        if isinstance(self.sim_max_time, timedelta):
             config_dict['sim_max_time'] = str(self.sim_max_time)  # Save timedelta as string
 
         helpers.save_json(config_dict, config_path, lock=False)
@@ -92,18 +93,18 @@ class TradingConfig:
             if 'timezone' in loaded_config:
                 loaded_config['timezone'] = pytz.timezone(loaded_config['timezone'])  # Convert string back to timezone
             if 'sim_start' in loaded_config:
-                loaded_config['sim_start'] = datetime.datetime.fromisoformat(loaded_config['sim_start'])  # Convert string back to datetime
+                loaded_config['sim_start'] = datetime.fromisoformat(loaded_config['sim_start'])  # Convert string back to datetime
             if 'sim_max_time' in loaded_config and isinstance(loaded_config['sim_max_time'], str):
                 # The string is in the form 'H:MM:SS' (e.g., '4:00:00')
                 time_str = loaded_config['sim_max_time']
                 hours, minutes, seconds = map(int, time_str.split(':'))
-                loaded_config['sim_max_time'] = datetime.timedelta(hours=hours, minutes=minutes, seconds=seconds)
-                # loaded_config['sim_max_time'] = datetime.timedelta(seconds=int(loaded_config['sim_max_time'].split()[0]))  # Convert string back to timedelta
+                loaded_config['sim_max_time'] = timedelta(hours=hours, minutes=minutes, seconds=seconds)
+                # loaded_config['sim_max_time'] = timedelta(seconds=int(loaded_config['sim_max_time'].split()[0]))  # Convert string back to timedelta
                 # Handle sim_offset (timedelta) from string 'H:MM:SS'
             # if 'sim_offset' in loaded_config:
             #     # Convert time string to timedelta
             #     hours, minutes, seconds = map(int, loaded_config['sim_offset'].split(':'))
-            #     loaded_config['sim_offset'] = datetime.timedelta(hours=hours, minutes=minutes, seconds=seconds)
+            #     loaded_config['sim_offset'] = timedelta(hours=hours, minutes=minutes, seconds=seconds)
 
             # if 'sim_offset' in loaded_config and isinstance(loaded_config['sim_offset'], str):
             #     # Split the time string into hours, minutes, and seconds
@@ -119,7 +120,7 @@ class TradingConfig:
             #     fractional_seconds = float(f"0.{seconds_and_fraction[1]}") if len(seconds_and_fraction) > 1 else 0.0  # Fractional part as float
 
             #     # Create a timedelta with fractional seconds
-            #     loaded_config['sim_offset'] = datetime.timedelta(hours=hours, minutes=minutes, seconds=seconds, microseconds=fractional_seconds * 1e6)
+            #     loaded_config['sim_offset'] = timedelta(hours=hours, minutes=minutes, seconds=seconds, microseconds=fractional_seconds * 1e6)
 
             if 'sim_offset' in loaded_config and isinstance(loaded_config['sim_offset'], str):
                 # Check if the string contains 'day' or 'days'
@@ -142,7 +143,7 @@ class TradingConfig:
                 fractional_seconds = float(f"0.{seconds_and_fraction[1]}") if len(seconds_and_fraction) > 1 else 0.0  # Fractional seconds
 
                 # Create a timedelta including days, hours, minutes, seconds, and fractional seconds
-                loaded_config['sim_offset'] = datetime.timedelta(days=days, hours=hours, minutes=minutes,
+                loaded_config['sim_offset'] = timedelta(days=days, hours=hours, minutes=minutes,
                                                                 seconds=seconds, microseconds=fractional_seconds * 1e6)
 
             return self.set_config(loaded_config)

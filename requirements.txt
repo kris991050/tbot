@@ -15,6 +15,7 @@ speedtest
 pandas_market_calendars
 chardet
 filelock
+fastparquet
 yfinance
 polygon
 psutil

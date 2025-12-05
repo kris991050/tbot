@@ -52,24 +52,24 @@ ALLOWED_WORKERS = {
 }
 
 
-def run_live_scans_fetcher(wait_seconds:int, live_mode:str, ib_client_id:int, paper_trading:str, remote_ib:bool, seed:int=None):
+def run_live_scans_fetcher(wait_seconds:int, live_mode:str, ib_client_id:int, strategy_name:str, paper_trading:str, remote_ib:bool, seed:int=None):
     scans_fetcher = live_scans_fetcher.LiveScansFetcher(wait_seconds=wait_seconds, live_mode=live_mode, ib_client_id=ib_client_id,
                                                         paper_trading=paper_trading, remote_ib=remote_ib)
     scans_fetcher.run()
 
 
-def run_live_L2_fetcher(wait_seconds:int, live_mode:str, ib_client_id:int, paper_trading:str, remote_ib:bool, seed:int=None):
+def run_live_L2_fetcher(wait_seconds:int, live_mode:str, ib_client_id:int, strategy_name:str, paper_trading:str, remote_ib:bool, seed:int=None):
     L2_fetcher = live_L2_fetcher.LiveL2Fetcher(wait_seconds=wait_seconds, live_mode=live_mode, ib_client_id=ib_client_id,
                                                paper_trading=paper_trading, remote_ib=remote_ib, ib_disconnect=True)
     L2_fetcher.run()
 
-def run_live_queue_manager(wait_seconds:int, live_mode:str, ib_client_id:int, paper_trading:str, remote_ib:bool, seed:int=None):
-    qmanager = live_queue_manager.LiveQueueManager(wait_seconds=wait_seconds, live_mode=live_mode, ib_client_id=ib_client_id, seed=seed,
-                                             paper_trading=paper_trading, remote_ib=remote_ib)
+def run_live_queue_manager(wait_seconds:int, live_mode:str, ib_client_id:int, strategy_name:str, paper_trading:str, remote_ib:bool, seed:int=None):
+    qmanager = live_queue_manager.LiveQueueManager(wait_seconds=wait_seconds, live_mode=live_mode, ib_client_id=ib_client_id, strategy_name=strategy_name, 
+                                                   seed=seed, paper_trading=paper_trading, remote_ib=remote_ib)
     qmanager.run()
 
-def run_live_worker(action:str, wait_seconds:int, look_backward:str, live_mode:str, paper_trading:bool, remote_ib:bool, initialize:bool=True):
-    worker = live_worker.LiveWorker(action=action, wait_seconds=wait_seconds, initialize=initialize, look_backward=look_backward,
+def run_live_worker(action:str, wait_seconds:int, look_backward:str, strategy_name:str, live_mode:str, paper_trading:bool, remote_ib:bool, initialize:bool=True):
+    worker = live_worker.LiveWorker(action=action, wait_seconds=wait_seconds, initialize=initialize, look_backward=look_backward, strategy_name=strategy_name, 
                                                 live_mode=live_mode, paper_trading=paper_trading, remote_ib=remote_ib)
     worker.run()
 
@@ -239,11 +239,11 @@ class ProcessManager:
 class ProcessUtils:
     @staticmethod
     def build_workers_params(scan_rate_min):
-        qm_wait_seconds = round(1.8129928244517726 * scan_rate_min ** 0.4054470965496836, 0) # Parameters found by curve fitting
-        bworkers_wait_seconds = round(1.9555599606573566 * scan_rate_min ** 0.24176996187317087, 0) # Parameters found by curve fitting
+        qm_wait_seconds = int(round(1.8129928244517726 * scan_rate_min ** 0.4054470965496836, 0)) # Parameters found by curve fitting
+        bworkers_wait_seconds = int(round(1.9555599606573566 * scan_rate_min ** 0.24176996187317087, 0)) # Parameters found by curve fitting
         return  {
-            'scans_fetcher': {'wait_seconds': 3 * 60, 'ib_client_id': 9},#, 'pname': 'scans_fetcher'},
-            'L2_fetcher': {'wait_seconds': 5 * 60, 'ib_client_id': 10},#, 'pname': 'L2_fetcher'},
+            'scans_fetcher': {'wait_seconds': 3 * 60, 'ib_client_id': 29},#, 'pname': 'scans_fetcher'},
+            'L2_fetcher': {'wait_seconds': 5 * 60, 'ib_client_id': 30},#, 'pname': 'L2_fetcher'},
             'queue_manager': {'wait_seconds': qm_wait_seconds, 'ib_client_id': -1},#, 'pname': 'queue_manager'},
             'data_fetcher': {'wait_seconds': bworkers_wait_seconds, 'ib_client_id': None},#, 'pname': 'data_fetcher'},
             'data_enricher': {'wait_seconds': bworkers_wait_seconds, 'ib_client_id': None},#, 'pname': 'data_enricher'},
@@ -432,7 +432,7 @@ class ProcessUtils:
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python fetcher_manager.py <fetcher_name> [args...]")
+        print("Usage: python process_manager.py <fetcher_name> [args...]")
         sys.exit(1)
 
     worker_name = sys.argv[1]

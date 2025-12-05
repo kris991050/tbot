@@ -12,8 +12,9 @@ import live_data_logger, trading_config
 
 
 class LiveOrchestrator:
-    def __init__(self, max_fetchers:int=2, max_enrichers:int=2, new_terminal:bool=True, tail_log:bool=True, seed:int=None, strategy_name:str=None, stop=None,
-                 look_backward:str=None, revised:bool=None, live_mode:str='live', paper_trading:bool=None, file_format:str=None, remote_ib:bool=None, timezone=None):
+    def __init__(self, max_fetchers:int=2, max_enrichers:int=6, max_executers:int=2, new_terminal:bool=True, tail_log:bool=True, seed:int=None, 
+                 strategy_name:str=None, stop=None, look_backward:str=None, revised:bool=None, live_mode:str='live', paper_trading:bool=None, 
+                 file_format:str=None, remote_ib:bool=None, timezone=None):
         self.ib = IB()
         self.look_backward = look_backward
         self.live_mode = helpers.set_var_with_constraints(live_mode, CONSTANTS.MODES['live'])
@@ -22,8 +23,7 @@ class LiveOrchestrator:
         self.logger = live_data_logger.LiveDataLogger(config=self.config, strategy_name=self.config.strategy_name)
         self.config.save_config(self.logger.config_file_path)
 
-        self.max_fetchers = max_fetchers
-        self.max_enrichers = max_enrichers
+        self.max_workers = {'fetch': max_fetchers, 'enrich': max_enrichers, 'execut': max_executers}
         self.new_terminal = new_terminal
         self.tail_log = tail_log
         self.workers_list = CONSTANTS.WORKERS_TYPES
@@ -43,13 +43,15 @@ class LiveOrchestrator:
     def _build_args_worker(self, wtype, initialize:bool=True):
             # Case white worker
             if wtype in self.workers_list['white']:
-                return (self.workers_params[wtype]['wait_seconds'], self.config.live_mode, self.workers_params[wtype]['ib_client_id'],self.config.paper_trading,
-                    self.config.remote_ib)
+                return (self.workers_params[wtype]['wait_seconds'], self.config.live_mode, self.workers_params[wtype]['ib_client_id'], self.config.strategy_name, 
+                        self.config.paper_trading, self.config.remote_ib)
 
             # Case blue worker
             elif wtype in self.workers_list['blue']:
-                return (wtype, self.workers_params[wtype]['wait_seconds'], self.look_backward, self.config.live_mode, self.config.paper_trading,
-                    self.config.remote_ib, initialize)
+                action = next(action for action in CONSTANTS.LIVE_ACTIONS if wtype in CONSTANTS.WORKERS_TYPES['blue'] \
+                              and CONSTANTS.WORKERS_TYPES['blue'].index(wtype) == CONSTANTS.LIVE_ACTIONS.index(action))
+                return (action, self.workers_params[wtype]['wait_seconds'], self.look_backward, self.config.strategy_name, self.config.live_mode, 
+                        self.config.paper_trading, self.config.remote_ib, initialize)
             return ()
 
     def _build_processes_params(self):
@@ -78,26 +80,45 @@ class LiveOrchestrator:
         self.pmanager.launch_process(target=process_manager.run_live_queue_manager, wtype='queue_manager')
 
     def run_data_worker(self, wtype:str):
-        print(f"⚡ Starting live data {wtype}er...")
+        print(f"⚡ Starting live {wtype}...")
         self.pmanager.launch_process(process_manager.run_live_worker, wtype=wtype)
+    
+    def _auto_start_workers(self, counts_workers):
+        for action in CONSTANTS.LIVE_ACTIONS:
+            queue = self.logger.get_queue(action, lock=True)
+            if len(queue) > counts_workers[action]['current'] * counts_workers[action]['threshold'] and counts_workers[action]['current'] < self.max_workers[action]:
+                print(f"🏗️ Starting new {action} worker")
+                self.run_data_worker(wtype=f'data_{action}er')
+                counts_workers[action]['current'] += 1
+        return counts_workers
 
     def orchestrate_processes(self):
         print("🌐 Starting web server...")
-        self._run_web_server()
+        # self._run_web_server()
 
         # Start workers
-        # self.run_scans_fetcher()
-        # self.run_L2_fetcher()
-        # self.run_queue_manager()
-        # self.run_data_worker(wtype='data_fetcher')
-        # self.run_data_worker(wtype='data_enricher')
-        # self.run_data_worker(wtype='data_executer')
+        if self.config.live_mode == 'live':
+            self.run_scans_fetcher()
+            self.run_L2_fetcher()
+        self.run_queue_manager()
+        self.run_data_worker(wtype='data_fetcher')
+        self.run_data_worker(wtype='data_enricher')
+        self.run_data_worker(wtype='data_executer')
 
-        count = 0
-
+        counts_workers = {
+            'fetch': {'current': 1, 'threshold': 20}, 
+            'enrich': {'current': 1, 'threshold': 10}, 
+            'execut': {'current': 1, 'threshold': 20}}
         while True:#count < 20:
             self.ib.sleep(2)
             self.pmanager.processes = process_manager.ProcessUtils.update_process_list(processes=self.pmanager.processes)
+            print("self.pmanager.processes = \n")
+            for proc in self.pmanager.processes:
+                print(proc)
+
+            counts_workers = self._auto_start_workers(counts_workers)
+            
+
             # self.pmanager.processes = process_manager.ProcessUtils.update_process_list2(processes=self.pmanager.processes)
             # pdict = {'name': f"process_{count}", 'pids': [count], 'status': 'running'}
             # print(pdict)
@@ -208,7 +229,7 @@ if __name__ == "__main__":
 
     orchestrator = LiveOrchestrator(seed=seed, strategy_name=strategy_name, revised=revised, live_mode=mode, paper_trading=paper_trading, remote_ib=remote_ib,
                                     new_terminal=new_terminal, tail_log=tail_log)
-    # orchestrator.orchestrate_processes()
+    orchestrator.orchestrate_processes()
 
 
 
