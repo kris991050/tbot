@@ -163,6 +163,9 @@ class LiveWorker(live_loop_base.LiveLoopBase):
                         self.tmanager.capital -= quantity * order_avg_fill_price
                     else:
                         self.tmanager.get_equity()
+
+                    # Adjust bracket orders and trim if excess
+                    orders.adjust_bracket_orders(ib=self.ib, symbol=symbol, currency=oorder.currency)
             else:
                 print(f"Could not execute order for {symbol} or already existing open position.")
 
