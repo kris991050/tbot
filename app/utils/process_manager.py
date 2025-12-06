@@ -241,6 +241,7 @@ class ProcessUtils:
     def build_workers_params(scan_rate_min):
         qm_wait_seconds = int(round(1.8129928244517726 * scan_rate_min ** 0.4054470965496836, 0)) # Parameters found by curve fitting
         bworkers_wait_seconds = int(round(1.9555599606573566 * scan_rate_min ** 0.24176996187317087, 0)) # Parameters found by curve fitting
+        bworkers_wait_seconds = 2
         return  {
             'scans_fetcher': {'wait_seconds': 3 * 60, 'ib_client_id': 29},#, 'pname': 'scans_fetcher'},
             'L2_fetcher': {'wait_seconds': 5 * 60, 'ib_client_id': 30},#, 'pname': 'L2_fetcher'},

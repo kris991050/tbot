@@ -10,7 +10,7 @@ from utils.constants import CONSTANTS
 
 class TradingConfig:
     def __init__(self, live_mode:str='live'):
-        self.capital: float = 10000
+        self.initial_capital: float = 10000
         self.risk_pct: float = 0.01    # risk per trade (1%)
         self.sl_pct: float = 0.05               # stop loss: 1%
         self.tp_pct: float = 0.1                # take profit: 2%
@@ -59,7 +59,7 @@ class TradingConfig:
 
         # Simualtion config
         self.live_mode = helpers.set_var_with_constraints(live_mode, CONSTANTS.MODES['live']) or 'live'
-        self.sim_start = self.timezone.localize(datetime(2025, 12, 4, 9, 30, 0))
+        self.sim_start = self.timezone.localize(datetime(2025, 12, 5, 13, 00, 00))
         self.sim_max_time = timedelta(hours=4, minutes=0)
         self.set_sim_offset()
 

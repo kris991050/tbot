@@ -62,6 +62,19 @@ class TradeManager:
         self.trainer, self.trainer_dd = self._load_models()
         self.direction = self._resolve_direction()
         self.all_trades = []
+        self.capital = self.get_equity()
+
+    def get_equity(self):
+        if not self.config.paper_trading:
+            account_values = self.ib.accountValues()
+            self.ib.sleep(CONSTANTS.PROCESS_TIME['long'])
+            if account_values:
+                return float([accountValue.value for accountValue in self.ib.accountValues() if accountValue.tag == 'CashBalance' and accountValue.currency == self.config.currency][0])
+            else:
+                print(f"⚠️ Could not get account values. Returning 0.")
+                return 0
+        else:
+            return self.config.initial_capital
 
     def _get_strategy_instance(self):
         return get_strategy_instance(self.strategy_name, self.config)
@@ -278,7 +291,7 @@ class TradeManager:
             # Calculate the quantity based on the risk percentage and capital
             risk_pct_adjusted = risk_pct * quantity_factor
             risk = price - stop_price
-            quantity = min(math.ceil(risk_pct_adjusted * capital / risk), capital * 0.9 / risk) # 0.9 to keep a buffer and not buy more than the available capital
+            quantity = int(min(math.ceil(risk_pct_adjusted * capital / risk), capital * 0.9 / price)) # 0.9 to keep a buffer and not buy more than the available capital
             return quantity
 
 

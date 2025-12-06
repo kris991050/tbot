@@ -6,7 +6,8 @@ sys.path.append(parent_folder)
 
 from execution import orders
 from live import trading_config
-from utils import helpers, constants
+from utils import helpers
+from utils.constants import CONSTANTS
 
 
 class OOrder():
@@ -24,15 +25,6 @@ class TradeExecutor():
     def __init__(self, ib=IB(), config=None):
         self.ib = ib
         self.config = config or trading_config.TradingConfig().set_config(locals())
-        self.equity = self._get_equity()
-
-    def _get_equity(self):
-        account_values = self.ib.accountValues()
-        self.ib.sleep(constants.CONSTANTS.PROCESS_TIME['long'])
-        if account_values:
-            return float([accountValue.value for accountValue in self.ib.accountValues() if accountValue.tag == 'CashBalance' and accountValue.currency == self.config.currency][0])
-        else:
-            return self.config.capital
 
     def execute_order(self, direction:int, oorder:OOrder, ideal_price:float=None, price_diff_threshold:float=None):
         contract, mktData = helpers.get_symbol_mkt_data(self.ib, oorder.symbol, currency=oorder.currency)
@@ -41,6 +33,8 @@ class TradeExecutor():
 
             price = mktData.ask if direction == 1 else (mktData.bid if direction == -1 else None)
             price_bis = mktData.bid if direction == 1 else (mktData.ask if direction == -1 else None)
+            if not price:
+                return None, None
 
             # Check if price used for evaluation not too different from real price
             if ideal_price and price_diff_threshold and abs(price - ideal_price) > price_diff_threshold:
@@ -53,12 +47,12 @@ class TradeExecutor():
                 return None, None
 
             # Place order
-            order, TPSL_order = orders.autoOrder(self.ib, contract, direction, oorder.quantity, mktData, self.config.offset_targets, oorder.take_profit, oorder.stop_loss, oorder.order_type)#, TP_qty=delta_TP, SL_qty=delta_SL)#, ocaGroup=ocaGroup, ocaType=2)
+            trade, TPSL_trades = orders.autoOrder(self.ib, contract, direction, oorder.quantity, mktData, self.config.offset_targets, oorder.take_profit, oorder.stop_loss, oorder.order_type)#, TP_qty=delta_TP, SL_qty=delta_SL)#, ocaGroup=ocaGroup, ocaType=2)
             action = 'BUY' if direction == 1 else ('SELL' if direction == -1 else None)
             print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + ' - ' + action.lower() + ' order for ' + oorder.symbol + ': ' + str(direction * oorder.quantity) + ' shares @ ' + str(price) + '\n')
-            self.ib.sleep(constants.CONSTANTS.PROCESS_TIME['medium'])
+            self.ib.sleep(CONSTANTS.PROCESS_TIME['medium'])
 
-            return order, TPSL_order
+            return trade, TPSL_trades
 
         else:
             print(f"📵 Could not execute order, no Market Data found for {oorder.symbol}.")
@@ -79,7 +73,7 @@ class TradeExecutor():
                 text_close = 'Closing' if partial == 100 else 'Partialling'
                 print(text_close, ' position for symbol ', oorder_copy.symbol)
                 self.execute_order(self.ib, direction, oorder_copy)
-                self.ib.sleep(constants.CONSTANTS.PROCESS_TIME['short'])
+                self.ib.sleep(CONSTANTS.PROCESS_TIME['short'])
         else:
             print('\nNo position found for this symbol')
 

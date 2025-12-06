@@ -97,9 +97,9 @@ class LiveOrchestrator:
         # self._run_web_server()
 
         # Start workers
-        if self.config.live_mode == 'live':
-            self.run_scans_fetcher()
-            self.run_L2_fetcher()
+        # if self.config.live_mode == 'live':
+        #     self.run_scans_fetcher()
+        #     self.run_L2_fetcher()
         self.run_queue_manager()
         self.run_data_worker(wtype='data_fetcher')
         self.run_data_worker(wtype='data_enricher')
@@ -229,7 +229,7 @@ if __name__ == "__main__":
 
     orchestrator = LiveOrchestrator(seed=seed, strategy_name=strategy_name, revised=revised, live_mode=mode, paper_trading=paper_trading, remote_ib=remote_ib,
                                     new_terminal=new_terminal, tail_log=tail_log)
-    orchestrator.orchestrate_processes()
+    # orchestrator.orchestrate_processes()
 
 
 

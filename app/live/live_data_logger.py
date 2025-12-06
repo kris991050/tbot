@@ -29,8 +29,8 @@ class LiveDataLogger:
         enrich_queue_file_name = f"enrich_queue_live_{date_now.strftime("%Y%m%d")}{sim_str}.json"
         execute_queue_file_name = f"execute_queue_live_{date_now.strftime("%Y%m%d")}{sim_str}.json"
         date_folder = helpers.get_path_date_folder(date_now, create_if_none=True)
-        logs_folder = helpers.get_path_daily_logs_folder(date_now, create_if_none=True)
         strategy_folder = helpers.get_path_daily_strategy_folder(self.config.strategy_name, date_now, create_if_none=self.strategy_name is not None)
+        logs_folder = helpers.get_path_daily_logs_folder(date_now, create_if_none=True, base_folder=strategy_folder)
         self.config_file_path = os.path.join(strategy_folder, config_file_name)
         self.tickers_log_file_path = os.path.join(strategy_folder, tickers_file_name)
         self.queue_paths = {
@@ -152,14 +152,14 @@ class LiveDataLogger:
     def save_to_trade_log_csv(self, ib, time_order, symbol, row, quantity, target_price, stop_price, order_status, order_avg_fill, required_columns):
         required_columns_trimmed = [col for col in required_columns if col in row.index]
 
-        helpers.initialize_log_csv_file(self.trade_log_file_path, ['Entry Time', 'Symbol', 'Close', 'Quantity', 'Target', 'Stop', 'Prediction', \
+        helpers.initialize_log_csv_file(self.trade_log_file_path, ['Entry Time', 'Symbol', 'Strategy', 'Close', 'Quantity', 'Target', 'Stop', 'Prediction', \
                                                                    'Order Status', 'Order Avg Fill', *required_columns_trimmed, 'Avg Volume', 'Rel Volume', 'Floats', \
                                                                     'Market Cap', 'Index', 'Last Earning', 'News'])
 
         with open(self.trade_log_file_path, mode='a') as file:
             infos = helpers.get_symbol_infos(ib, symbol)
             file_writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-            file_writer.writerow([time_order, symbol, row['close'], quantity, target_price, stop_price, row['model_prediction'], \
+            file_writer.writerow([time_order, symbol, self.strategy_name, row['close'], quantity, target_price, stop_price, row['model_prediction'], \
                                   order_status, order_avg_fill, *row[required_columns_trimmed].to_list(), infos['avg_volume'], \
                                     infos['rel_volume'], infos['floats'], infos['market_cap'], infos['index'], \
                                         infos['last_earning_date'], infos['news']])

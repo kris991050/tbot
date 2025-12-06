@@ -84,7 +84,7 @@ class CustomBacktestEngine:
         self.entry_commission = 0.0
         self.exit_commission = 0.0
         self.slippage_pct = 0.001
-        self.capital = self.tmanager.config.capital
+        self.capital = self.tmanager.config.initial_capital
     
     def _build_df_tr(self):
         if self.tmanager.strategy_instance.revised:
@@ -123,7 +123,7 @@ class CustomBacktestEngine:
                     decision_prediction = decision_row['model_prediction']
                     entry_prediction = curr_row['model_prediction']
                     quantity = self.tmanager.evaluate_quantity(entry_prediction, entry_price, self.active_stop_price, 
-                                                               self.tmanager.config.capital, self.tmanager.config.risk_pct)
+                                                               self.capital, self.tmanager.config.risk_pct)
                     curr_row = self.tmanager.add_pred_vlty(curr_row, self.symbol)
 
                     # Resolve stop once here

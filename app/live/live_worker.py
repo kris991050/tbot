@@ -116,31 +116,39 @@ class LiveWorker(live_loop_base.LiveLoopBase):
             # Set target entry time and price
             self.tmanager.set_target_for_entry(row=last_row, stop_price=stop_price, symbol=symbol)
             target_price = self.tmanager.strategy_instance.target_handler.target_price
-            quantity = self.tmanager.evaluate_quantity(last_row['model_prediction'], last_row['close'], stop_price, self.config.capital, self.config.risk_pct)
+            quantity = self.tmanager.evaluate_quantity(last_row['model_prediction'], last_row['close'], stop_price, self.tmanager.capital, self.config.risk_pct)
             # values = self._create_trade_params(symbol, stop_price, target_price, quantity)
 
             open_position = orders.get_positions_by_symbol(self.ib, symbol)
 
             if not open_position:
                 oorder = trade_executor.OOrder(symbol=symbol, stop_loss=stop_price, take_profit=target_price, quantity=quantity, config=self.config)
+                now = helpers.calculate_now(self.config.sim_offset, self.config.timezone)
                 if self.config.live_mode == 'live':
                     # price_diff_threshold = abs(target_price - last_row['close']) / self.config.rrr_threshold if (target_price and self.config.rrr_threshold) \
                     #     else 0.05 * last_row['close'] # Fallback if no stop_price. In case no target_price as well, max price diff is 5% of price.
                     price_diff_threshold = abs(((target_price + self.config.rrr_threshold * stop_price) / (1 + self.config.rrr_threshold)) - last_row['close']) \
                         if (target_price and stop_price and self.config.rrr_threshold) else 0.05 * last_row['close'] # Fallback if no stop_price. In case no target_price as well, max price diff is 5% of price.
-                    order, TPSL_order = self.executor.execute_order(self.tmanager.direction, oorder, last_row['close'], price_diff_threshold)
-                now = helpers.calculate_now(self.config.sim_offset, self.config.timezone)
-                self.ib.sleep(CONSTANTS.PROCESS_TIME['long'])
-                order_status = order.orderStatus.status if hasattr(order, 'orderStatus') else None
-                order_avg_fill_price = order.orderStatus.avgFillPrice if hasattr(order, 'orderStatus') else None
-                self.logger.save_to_trade_log_csv(self.ib, now, symbol, last_row, quantity, target_price, stop_price, order_status, order_avg_fill_price,  self.tmanager.get_required_columns())
-            else:
-                order = None
+                    trade, TPSL_trades = self.executor.execute_order(self.tmanager.direction, oorder, last_row['close'], price_diff_threshold)
+                    self.ib.sleep(CONSTANTS.PROCESS_TIME['long'])
+                    fill_time = trade.fills[0].time if trade.fills else now
+                    order_status = trade.orderStatus.status if hasattr(trade, 'orderStatus') else None
+                    order_avg_fill_price = trade.orderStatus.avgFillPrice if hasattr(trade, 'orderStatus') else None
+                    self.ib.sleep(CONSTANTS.PROCESS_TIME['long'])
+                elif self.config.live_mode == 'sim':
+                    order_status = 'Simulated'
+                    order_avg_fill_price = last_row['close']
+                    fill_time = now
+                    trade = oorder
 
-            if order is not None and order_status:
+                self.logger.save_to_trade_log_csv(self.ib, fill_time, symbol, last_row, quantity, target_price, stop_price, order_status, order_avg_fill_price,  self.tmanager.get_required_columns())
+            else:
+                trade = None
+
+            if trade is not None and order_status:
                 print(f"Order placed with status {order_status}")
                 # print(TPSL_order.orderStatus.status)
-                if order_status in ['Filled', 'Submitted']:
+                if order_status in ['Filled', 'Submitted', 'Simulated']:
                     # Log order execution
                     message = f"Executed order for {symbol} with quantity: {quantity}, stop price: {stop_price}, target price: {target_price}, model prediction: {last_row['model_prediction']}."
                     # logging.info(message)
@@ -148,7 +156,13 @@ class LiveWorker(live_loop_base.LiveLoopBase):
                     self.tickers_list = self.logger.update_ticker(symbol, 'priority', 4, lock=True, log=True)
 
                 open_position = orders.get_positions_by_symbol(self.ib, symbol)
+                self.ib.sleep(CONSTANTS.PROCESS_TIME['long'])
                 print(f"Open position: {open_position}")
+                if open_position:
+                    if self.config.paper_trading:
+                        self.tmanager.capital -= quantity * order_avg_fill_price
+                    else:
+                        self.tmanager.get_equity()
             else:
                 print(f"Could not execute order for {symbol} or already existing open position.")
 

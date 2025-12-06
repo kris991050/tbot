@@ -94,22 +94,20 @@ def placeTPSLOrders(ib, contract, action, qty, TP, SL, trail=None, ocaGroup=None
     if not ocaGroup: ocaGroup = datetime.datetime.now().strftime('%Y%m%d%H:%M:%S')
 
     TP_order, SL_order = None, None
-    bracket = []
     if SL:
         SL = round(SL, 2)
         if not trail: SL_order = Order(orderId=order_id_SL, action=action, totalQuantity=qty, orderType="STP", auxPrice=SL, ocaGroup=ocaGroup, ocaType=ocaType, transmit=True, tif='GTC', outsideRth=True)
         else: SL_order = Order(orderId=order_id_SL, action=action, totalQuantity=qty, orderType="TRAIL", trailStopPrice=SL, auxPrice=trail, ocaGroup=ocaGroup, ocaType=ocaType, transmit=True, tif='GTC', outsideRth=True)
-        bracket.append(SL_order)
+        print("Placing ", SL_order.action," SL order ID ", SL_order.orderId, ": Qty ", SL_order.totalQuantity, ", auxPrice ", SL_order.auxPrice) if SL_order else print("No SL order")
     if TP:
         TP = round(TP, 2)
         TP_order = Order(orderId=order_id_TP, action=action, totalQuantity=qty, orderType="LMT", lmtPrice=TP, ocaGroup=ocaGroup, ocaType=ocaType, transmit=True, tif='GTC', outsideRth=True)
-        bracket.append(TP_order)
+        print("Placing ", TP_order.action," TP order ID ", TP_order.orderId, ": Qty ", TP_order.totalQuantity, ", lmtPrice ", TP_order.lmtPrice) if TP_order else print("No TP order")
 
-    print("Placing ", TP_order.action," TP order ID ", TP_order.orderId, ": Qty ", TP_order.totalQuantity, ", lmtPrice ", TP_order.lmtPrice) if TP_order else print("No TP order")
-    print("Placing ", SL_order.action," SL order ID ", SL_order.orderId, ": Qty ", SL_order.totalQuantity, ", auxPrice ", SL_order.auxPrice) if SL_order else print("No SL order")
-
-    for o in bracket:
-        ib.placeOrder(contract, o)
+    trade_SL = ib.placeOrder(contract, SL_order) if SL_order else None
+    trade_TP = ib.placeOrder(contract, TP_order) if TP_order else None
+    
+    return trade_TP, trade_SL
 
 
 def autoOrder(ib, contract, direction, qty, data, offset_targets, TP='', SL='', order_type='Fast', TP_qty=None, SL_qty=None, trail=None, ocaGroup=None, ocaType=2):
@@ -138,11 +136,11 @@ def autoOrder(ib, contract, direction, qty, data, offset_targets, TP='', SL='', 
     # else:
     #     placeBracketOrder(ib, contract, action, qty, TP, SL, TP_qty=TP_qty, SL_qty=SL_qty, type=orderType, lmtPrice=lmtPrice, ocaGroup=ocaGroup, ocaType=ocaType)
 
-    order = placeOrder(ib, contract, action, qty, type=orderType, price=lmtPrice, trail=trail, ocaGroup=ocaGroup, ocaType=ocaType)
-    TPSL_order = placeTPSLOrders(ib, contract, action_inv[action], qty, TP, SL, trail=trail, ocaGroup=ocaGroup, ocaType=ocaType)
+    trade = placeOrder(ib, contract, action, qty, type=orderType, price=lmtPrice, trail=trail, ocaGroup=ocaGroup, ocaType=ocaType)
+    TPSL_trades = placeTPSLOrders(ib, contract, action_inv[action], qty, TP, SL, trail=trail, ocaGroup=ocaGroup, ocaType=ocaType)
     # if TP != '': placeOrder(ib, contract, action_inv[action], qty, type='LMT', price=TP, isPT=True, ocaGroup=ocaGroup, ocaType=ocaType)
     # if SL != '': placeOrder(ib, contract, action_inv[action], qty, type='STP', price=SL, ocaGroup=ocaGroup, ocaType=ocaType)
-    return order, TPSL_order
+    return trade, TPSL_trades
 
 
 def get_bracket_orders(ib, contract, action):

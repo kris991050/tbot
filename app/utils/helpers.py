@@ -167,7 +167,7 @@ def get_stock_currency_yf(symbol:str):
 # ======================
 
 
-def get_path_date_folder(date:datetime=None, create_if_none:bool=True, local:bool=False):
+def get_path_date_folder(date:datetime=None, create_if_none:bool=True, base_folder:bool=False):
 
     date = date or datetime.now(CONSTANTS.TZ_WORK)
     if isinstance(date, str):
@@ -176,8 +176,9 @@ def get_path_date_folder(date:datetime=None, create_if_none:bool=True, local:boo
         dateISO = date.strftime('%Y-%m-%d')
     date = dateISO.replace("-", "")
 
-    if not local: root_folder_path = PATHS.folders_path['journal']
-    else: root_folder_path = os.getcwd()
+    if not base_folder: root_folder_path = PATHS.folders_path['journal']
+    elif base_folder == 'local': root_folder_path = os.getcwd()
+    else: root_folder_path = base_folder
     date_folder_path = os.path.join(root_folder_path, date)
 
     if not os.path.exists(date_folder_path) and create_if_none:
@@ -186,11 +187,12 @@ def get_path_date_folder(date:datetime=None, create_if_none:bool=True, local:boo
     return date_folder_path
 
 
-def get_path_daily_folder(folder_name:str, date:datetime=None, create_if_none:bool=True, local:bool=False):
+def get_path_daily_folder(folder_name:str, date:datetime=None, create_if_none:bool=True, base_folder:bool=False):
 
     date = date or datetime.now(CONSTANTS.TZ_WORK)
-    if not local: root_folder_path = get_path_date_folder(date, create_if_none, local)
-    else: root_folder_path = os.getcwd()
+    if not base_folder: root_folder_path = get_path_date_folder(date, create_if_none, base_folder)
+    elif base_folder == 'local': root_folder_path = os.getcwd()
+    else: root_folder_path = base_folder
     daily_folder_path = os.path.join(root_folder_path, folder_name)
 
     if not os.path.exists(daily_folder_path) and create_if_none:
@@ -199,16 +201,19 @@ def get_path_daily_folder(folder_name:str, date:datetime=None, create_if_none:bo
     return daily_folder_path
 
 
-def get_path_daily_data_folder(date:datetime=None, create_if_none:bool=True, local:bool=False):
-    return get_path_daily_folder('daily_data', date, create_if_none, local)
+def get_path_daily_data_folder(date:datetime=None, create_if_none:bool=True, base_folder:bool=False):
+    return get_path_daily_folder('daily_data', date, create_if_none, base_folder)
 
 
-def get_path_daily_logs_folder(date:datetime=None, create_if_none:bool=True, local:bool=False):
-    return get_path_daily_folder('live_logs', date, create_if_none, local)
+def get_path_daily_strategy_folder(strategy_name:str, date:datetime=None, create_if_none:bool=True, base_folder:bool=False):
+    return get_path_daily_folder(f'live_{strategy_name}', date, create_if_none, base_folder)
 
 
-def get_path_daily_strategy_folder(strategy_name:str, date:datetime=None, create_if_none:bool=True, local:bool=False):
-    return get_path_daily_folder(f'live_{strategy_name}', date, create_if_none, local)
+def get_path_daily_logs_folder(date:datetime=None, create_if_none:bool=True, base_folder:bool=False):#, strategy_name:str=None):
+    # if strategy_name:
+    #     strategy_folder = get_path_daily_strategy_folder(strategy_name=strategy_name, date=date, create_if_none=create_if_none, base_folder=base_folder)
+    #     return get_path_daily_folder('live_logs', date, create_if_none, strategy_folder)
+    return get_path_daily_folder('live_logs', date, create_if_none, base_folder)
     
 
 def path_current_setup(path_current_file, ch_dir=True, print_path=True):
@@ -722,9 +727,9 @@ def get_tick_value(price):
 
 
 def get_symbol_seed_list(seed:int, base_folder:str=PATHS.folders_path['market_data']):
-    if not seed:
+    if seed is None:
         return []
-    stock_list_file = os.path.join(base_folder, f"stock_list_seed{seed}.csv") if seed else None
+    stock_list_file = os.path.join(base_folder, f"stock_list_seed{seed}.csv") if seed is not None else None
     if not os.path.exists(stock_list_file):
         return []
 
@@ -907,7 +912,9 @@ def format_df_date(df, col='date', set_index=False):
         return df
 
     # Make sure date column is in datetime format
-    df[col] = pd.to_datetime(df[col], utc=True)
+    # df[col] = pd.to_datetime(df[col], utc=True)
+    # df[col] = df[col].dt.tz_convert(CONSTANTS.TZ_WORK)
+    df[col] = pd.to_datetime(df.loc[:, col], utc=True)  # Use .loc here to avoid pandas warning
     df[col] = df[col].dt.tz_convert(CONSTANTS.TZ_WORK)
 
     if set_index: df.index = df['date']
